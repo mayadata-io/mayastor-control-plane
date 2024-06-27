@@ -1071,21 +1071,14 @@ fn context_into_topology(context: &CreateParams) -> CreateVolumeTopology {
     pool_inclusive_label_topology.extend(
         context
             .publish_params()
-            .pool_affinity_topology_label()
+            .pool_has_topology_key()
             .clone()
             .unwrap_or_default(),
     );
     pool_inclusive_label_topology.extend(
         context
             .publish_params()
-            .pool_has_topology_key()
-            .clone()
-            .unwrap_or_default(),
-    );
-    node_inclusive_label_topology.extend(
-        context
-            .publish_params()
-            .node_affinity_topology_label()
+            .pool_affinity_topology_label()
             .clone()
             .unwrap_or_default(),
     );
@@ -1093,6 +1086,13 @@ fn context_into_topology(context: &CreateParams) -> CreateVolumeTopology {
         context
             .publish_params()
             .node_has_topology_key()
+            .clone()
+            .unwrap_or_default(),
+    );
+    node_inclusive_label_topology.extend(
+        context
+            .publish_params()
+            .node_affinity_topology_label()
             .clone()
             .unwrap_or_default(),
     );
