@@ -18,7 +18,7 @@ use utils::{dsp_created_by_key, DSP_OPERATOR};
 
 use regex::Regex;
 use std::{collections::HashMap, str::FromStr};
-use tonic::{Request, Response, Status};
+use tonic::{Code, Request, Response, Status};
 use tracing::{debug, error, instrument, trace, warn};
 use uuid::Uuid;
 use volume_capability::AccessType;
@@ -838,7 +838,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         })?;
         let create_params = CreateSnapshotParams::try_from(&request.parameters)?;
 
-        // Get the volume object. Extract the app node endpoint if the quiesce is requested.
+        // Get the volume object. Extract the app node endpoint if quiesce is requested.
         let volume = RestApiClient::get_client().get_volume(&volume_uuid).await?;
         let app_node_endpoint_info = match volume_app_node(&volume) {
             // Volume is not published, so no need to quiesce.
@@ -846,7 +846,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
             Some(info) => match create_params.quiesce().clone() {
                 None | Some(QuiesceFsCandidate::Freeze) => {
                     // If quiesce is requested, get the app node endpoint. Request would fail to
-                    // proceed if app node endpoint is not retieved.
+                    // proceed if app node endpoint is not retrieved.
                     let app_node = RestApiClient::get_client().get_app_node(&info).await?;
                     Some(app_node.spec.endpoint)
                 }
@@ -861,10 +861,18 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
             // If snapshot is already created in previous attempts, fetch and return it.
             Ok(snapshot) => Ok(snapshot),
             Err(ApiClientError::ResourceNotExists(_)) => {
-                if let Some(app_node_endpoint) = app_node_endpoint_info.clone() {
-                    issue_fs_freeze(app_node_endpoint, volume_uuid.to_string()).await?;
+                if let Some(ref app_node_endpoint) = app_node_endpoint_info {
+                    match issue_fs_freeze(app_node_endpoint.clone(), volume_uuid.to_string()).await
+                    {
+                        Err(error) if error.code() == Code::NotFound => {
+                            Err(Status::not_found(format!(
+                                "Failed to freeze volume {}, filesystem volume is not attached",
+                                volume_uuid
+                            )))
+                        }
+                        _else => _else,
+                    }?;
                 }
-
                 // Create the snapshot.
                 RestApiClient::get_client()
                     .create_volume_snapshot(&volume_uuid, &snap_uuid)
@@ -882,7 +890,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
             Err(error) => Err(error.into()),
         };
 
-        // Always unfreeze the filesystem if it quiesce was requested, as the retry mechanism can
+        // Always unfreeze the filesystem if quiesce was requested, as the retry mechanism can
         // leave filesystem frozen.
         let snapshot = if let Some(app_node_endpoint) = app_node_endpoint_info {
             let unfreeze_result =
