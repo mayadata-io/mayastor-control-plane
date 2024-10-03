@@ -323,7 +323,9 @@ impl Label for Pool {
             }
             OutputFormat::None => {
                 // In case the output format is not specified, show a success message.
-                let labels = pool.spec.unwrap().labels.unwrap_or_default();
+                let mut labels = pool.spec.unwrap().labels.unwrap_or_default();
+                let internal_label = external_utils::dsp_created_by_key();
+                labels.remove(&internal_label);
                 println!("Pool {id} labelled successfully. Current labels: {labels:?}");
             }
         }
