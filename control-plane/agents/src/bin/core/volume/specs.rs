@@ -845,18 +845,20 @@ impl ResourceSpecsLocked {
     pub(crate) fn check_capacity_limit_for_resize(
         &self,
         cluster_capacity_limit: u64,
-        current_borrowed_limit: u64,
+        mut capacity_limit: parking_lot::MutexGuard<u64>,
+        required: u64,
     ) -> Result<(), SvcError> {
         let specs = self.write();
         let total: u64 = specs.volumes.values().map(|v| v.lock().size).sum();
-        let forthcoming_total = current_borrowed_limit + total;
-        tracing::trace!(current_borrowed_limit=%current_borrowed_limit, total=%total, forthcoming_total=%forthcoming_total, "Cluster capacity limit checks ");
+        let forthcoming_total = *capacity_limit + total + required;
+        tracing::trace!(current_borrowed_limit=%capacity_limit, total=%total, forthcoming_total=%forthcoming_total, "Cluster capacity limit checks");
         if forthcoming_total > cluster_capacity_limit {
             return Err(SvcError::CapacityLimitExceeded {
                 cluster_capacity_limit,
                 excess: forthcoming_total - cluster_capacity_limit,
             });
         }
+        *capacity_limit += required;
         Ok(())
     }
 

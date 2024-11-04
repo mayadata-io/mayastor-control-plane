@@ -47,7 +47,7 @@ use stor_port::{
 pub(super) struct Service {
     registry: Registry,
     create_volume_limiter: std::sync::Arc<tokio::sync::Semaphore>,
-    capacity_limit_borrow: std::sync::Arc<parking_lot::RwLock<u64>>,
+    capacity_limit_borrow: std::sync::Arc<parking_lot::Mutex<u64>>,
 }
 
 #[tonic::async_trait]
@@ -257,7 +257,7 @@ impl Service {
             create_volume_limiter: std::sync::Arc::new(tokio::sync::Semaphore::new(
                 registry.create_volume_limit(),
             )),
-            capacity_limit_borrow: std::sync::Arc::new(parking_lot::RwLock::new(0)),
+            capacity_limit_borrow: std::sync::Arc::new(parking_lot::Mutex::new(0)),
             registry,
         }
     }
@@ -614,20 +614,17 @@ impl Service {
             .requested_size
             .checked_sub(volume.as_ref().size)
             .unwrap_or_default();
-        *self.capacity_limit_borrow.write() += required;
-        // If there is a defined system wide capacity limit, ensure we don't breach that.
-        let current = *self.capacity_limit_borrow.read();
-        self.specs()
-            .check_capacity_limit_for_resize(limit, current)
-            .map_err(|e| {
-                *self.capacity_limit_borrow.write() -= required;
-                e
-            })?;
+        {
+            let capacity_limit = self.capacity_limit_borrow.lock();
+            // If there is a defined system wide capacity limit, ensure we don't breach that.
+            self.specs()
+                .check_capacity_limit_for_resize(limit, capacity_limit, required)?;
+        }
 
         let resize_ret = volume.resize(&self.registry, request).await;
         // Reset the capacity limit that we consumed and will now be accounted in the system's
         // current total.
-        *self.capacity_limit_borrow.write() -= required;
+        *self.capacity_limit_borrow.lock() -= required;
         resize_ret
     }
 }
