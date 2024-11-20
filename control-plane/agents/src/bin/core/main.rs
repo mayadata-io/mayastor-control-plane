@@ -51,7 +51,7 @@ pub(crate) struct CliArgs {
     /// may still progress.
     /// We wait up to this period before considering the operation a failure and
     /// GC'ing the pool.
-    #[clap(long, default_value = "10m")]
+    #[clap(long, default_value = "15m")]
     pub(crate) pool_async_creat_tmo: humantime::Duration,
 
     /// Disable partial rebuild for volume targets.

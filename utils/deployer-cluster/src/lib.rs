@@ -1,3 +1,4 @@
+pub mod lvm;
 pub mod rest_client;
 
 use composer::{Builder, ComposeTest};
@@ -629,6 +630,10 @@ impl TmpDiskFile {
     pub fn uri(&self) -> &str {
         self.inner.uri()
     }
+    /// Disk path on the host.
+    pub fn path(&self) -> &str {
+        &self.inner.path
+    }
 
     /// Get the inner disk if there are no other references to it.
     pub fn into_inner(self) -> Result<TmpDiskFileInner, Arc<TmpDiskFileInner>> {
@@ -652,7 +657,10 @@ impl TmpDiskFileInner {
         }
     }
     fn make_path(name: &str) -> String {
-        format!("/tmp/io-engine-disk-{name}")
+        // todo: use known path to facilitate cleanup.
+        // let root = std::env::var("WORKSPACE_ROOT").as_deref().unwrap_or("/tmp");
+        let root = "/tmp";
+        format!("{root}/io-engine-disk-{name}")
     }
     fn uri(&self) -> &str {
         &self.uri

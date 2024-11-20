@@ -346,6 +346,11 @@ impl DestroyPool {
         Self { node, id }
     }
 }
+impl From<CreatePool> for DestroyPool {
+    fn from(value: CreatePool) -> Self {
+        Self::new(value.node, value.id)
+    }
+}
 
 /// Label Pool Request.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]

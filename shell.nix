@@ -53,6 +53,7 @@ mkShell {
     pytest_inputs
     tini
     udev
+    lvm2
   ] ++ pkgs.lib.optional (system == "aarch64-darwin") darwin.apple_sdk.frameworks.Security;
 
   LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
