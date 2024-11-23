@@ -4,11 +4,16 @@
 //! of volumes using iscsi/nvmf protocols on the node.
 
 use crate::{
-    error::FsfreezeError,
+    client::AppNodesClientWrapper,
+    error::CsiDriverError,
     fsfreeze::{bin::fsfreeze, FsFreezeOpt},
     identity::Identity,
     k8s::patch_k8s_node,
     mount::probe_filesystems,
+    mount_utils::bin::{
+        flag::{parse_mount_flags, parse_unmount_flags},
+        mount_utils::{mount, unmount},
+    },
     node::{Node, RDMA_CONNECT_CHECK},
     nodeplugin_grpc::NodePluginGrpcServer,
     nodeplugin_nvme::NvmeOperationsSvc,
@@ -20,7 +25,6 @@ use grpc::csi_node_nvme::nvme_operations_server::NvmeOperationsServer;
 use stor_port::platform;
 use utils::tracing_telemetry::{FmtLayer, FmtStyle};
 
-use crate::client::AppNodesClientWrapper;
 use clap::Arg;
 use futures::TryFutureExt;
 use serde_json::json;
@@ -255,6 +259,61 @@ pub(super) async fn main() -> anyhow::Result<()> {
                         .help("Uuid of the volume to unfreeze")
                 )
         )
+        .subcommand(
+            clap::Command::new("mount")
+                .arg(
+                    Arg::new("source")
+                        .long("source")
+                        .value_name("PATH")
+                        .required(true)
+                        .help("Mount source path")
+                )
+                .arg(
+                    Arg::new("target")
+                        .long("target")
+                        .value_name("PATH")
+                        .required(true)
+                        .help("Mount target path")
+                )
+                .arg(
+                    Arg::new("fstype")
+                        .long("fstype")
+                        .value_name("STRING")
+                        .help("Filesystem type for filesystem volume")
+                )
+                .arg(
+                    Arg::new("data")
+                        .long("data")
+                        .value_name("STRING")
+                        .help("Options to apply for the file system on mount")
+                )
+                .arg(
+                    Arg::new("mount-flags")
+                        .long("mount-flags")
+                        .value_name("STRING")
+                        .value_parser(parse_mount_flags)
+                        .required(true)
+                        .help("Mount flags")
+                )
+        )
+        .subcommand(
+            clap::Command::new("unmount")
+                .arg(
+                    Arg::new("target")
+                        .long("target")
+                        .value_name("PATH")
+                        .required(true)
+                        .help("Unmount target path")
+                )
+                .arg(
+                    Arg::new("unmount-flags")
+                        .long("unmount-flags")
+                        .value_name("STRING")
+                        .value_parser(parse_unmount_flags)
+                        .required(true)
+                        .help("Unmount flags")
+                )
+        )
         .get_matches();
     let tags = utils::tracing_telemetry::default_tracing_tags(
         utils::raw_version_str(),
@@ -272,13 +331,44 @@ pub(super) async fn main() -> anyhow::Result<()> {
         match cmd {
             ("fs-freeze", arg_matches) => {
                 let volume_id = arg_matches.get_one::<String>("volume-id").unwrap();
-                fsfreeze(volume_id, FsFreezeOpt::Freeze).await
+                fsfreeze(volume_id, FsFreezeOpt::Freeze)
+                    .await
+                    .map_err(|error| CsiDriverError::Fsfreeze { source: error })
             }
             ("fs-unfreeze", arg_matches) => {
                 let volume_id = arg_matches.get_one::<String>("volume-id").unwrap();
-                fsfreeze(volume_id, FsFreezeOpt::Unfreeze).await
+                fsfreeze(volume_id, FsFreezeOpt::Unfreeze)
+                    .await
+                    .map_err(|error| CsiDriverError::Fsfreeze { source: error })
             }
-            _ => Err(FsfreezeError::InvalidFreezeCommand),
+            ("mount", arg_matches) => {
+                let src_path = arg_matches.get_one::<String>("source").unwrap();
+                let dsc_path = arg_matches.get_one::<String>("target").unwrap();
+                let fstype = arg_matches.get_one::<String>("fstype");
+                let data = arg_matches.get_one::<String>("data");
+                let mnt_flags = arg_matches
+                    .get_one::<sys_mount::MountFlags>("mount-flags")
+                    .unwrap();
+                mount(
+                    src_path.to_string(),
+                    dsc_path.to_string(),
+                    data.cloned(),
+                    *mnt_flags,
+                    fstype.cloned(),
+                )
+                .await
+                .map_err(|error| CsiDriverError::Mount { source: error })
+            }
+            ("unmount", arg_matches) => {
+                let target_path = arg_matches.get_one::<String>("target").unwrap();
+                let flags = arg_matches
+                    .get_one::<sys_mount::UnmountFlags>("unmount-flags")
+                    .unwrap();
+                unmount(target_path.to_string(), *flags)
+                    .await
+                    .map_err(|error| CsiDriverError::Mount { source: error })
+            }
+            _ => Err(CsiDriverError::InvalidCsiDriverCommand),
         }?;
         return Ok(());
     }

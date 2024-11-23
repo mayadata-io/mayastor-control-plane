@@ -305,7 +305,7 @@ impl node_server::Node for Node {
             )
         })? {
             AccessType::Mount(mnt) => {
-                publish_fs_volume(&msg, mnt, &self.filesystems)?;
+                publish_fs_volume(&msg, mnt, &self.filesystems).await?;
             }
             AccessType::Block(_) => {
                 publish_block_volume(&msg).await?;
@@ -356,7 +356,7 @@ impl node_server::Node for Node {
         let target_path = Path::new(&msg.target_path);
         if target_path.exists() {
             if target_path.is_dir() {
-                unpublish_fs_volume(&msg)?;
+                unpublish_fs_volume(&msg).await?;
             } else {
                 if target_path.is_file() {
                     return Err(Status::new(
@@ -368,7 +368,7 @@ impl node_server::Node for Node {
                     ));
                 }
 
-                unpublish_block_volume(&msg)?;
+                unpublish_block_volume(&msg).await?;
             }
         }
         Ok(Response::new(NodeUnpublishVolumeResponse {}))
