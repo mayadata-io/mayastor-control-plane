@@ -89,13 +89,22 @@ impl MayastorMount {
             command.arg(FSTYPE).arg(fstype);
         }
 
-        match command.output().await {
-            Ok(output) if output.status.success() => Ok(self),
-            _ => Err(Status::aborted(format!(
-                "Failed to execute {} with args {:?}",
+        let output = command.output().await.map_err(|error| {
+            Status::aborted(format!(
+                "Failed to execute {} with args {:?}, error: {error}",
                 self.operation, self
-            ))),
+            ))
+        })?;
+
+        if output.status.success() {
+            return Ok(self);
         }
+
+        Err(Status::aborted(format!(
+            "{} command failed: {}",
+            self.operation,
+            String::from_utf8(output.stderr).unwrap()
+        )))
     }
 
     /// Unmounts a filesystem/block from a `target` path in the system.
@@ -104,17 +113,27 @@ impl MayastorMount {
 
         let mut command = Command::new(&self.binary_name);
         command
+            .arg(&self.operation)
             .arg(TARGET)
             .arg(&self.target)
             .arg(UNMOUNT_FLAGS)
             .arg(&self.flags);
 
-        match command.output().await {
-            Ok(output) if output.status.success() => Ok(()),
-            _ => Err(Status::aborted(format!(
-                "Failed to execute {} with args {:?}",
+        let output = command.output().await.map_err(|error| {
+            Status::aborted(format!(
+                "Failed to execute {} with args {:?}, error: {error}",
                 self.operation, self
-            ))),
+            ))
+        })?;
+
+        if output.status.success() {
+            return Ok(());
         }
+
+        Err(Status::aborted(format!(
+            "{} command failed: {}",
+            self.operation,
+            String::from_utf8(output.stderr).unwrap()
+        )))
     }
 }
