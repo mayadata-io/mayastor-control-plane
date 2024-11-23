@@ -1,4 +1,4 @@
-use crate::error::FsfreezeError;
+use crate::error::CsiDriverError;
 use std::process::ExitCode;
 
 /// todo: cleanup this module cfg repetition..
@@ -31,6 +31,8 @@ mod match_dev;
 #[cfg(target_os = "linux")]
 mod mount;
 #[cfg(target_os = "linux")]
+mod mount_utils;
+#[cfg(target_os = "linux")]
 mod node;
 #[cfg(target_os = "linux")]
 mod nodeplugin_grpc;
@@ -52,7 +54,7 @@ async fn main() -> anyhow::Result<ExitCode> {
         error
     }) {
         Ok(_) => Ok(ExitCode::SUCCESS),
-        Err(error) => match error.downcast::<FsfreezeError>() {
+        Err(error) => match error.downcast::<CsiDriverError>() {
             Ok(error) => Ok(error.into()),
             Err(error) => Err(error),
         },

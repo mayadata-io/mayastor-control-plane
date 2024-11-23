@@ -13,6 +13,7 @@ use csi_driver::PublishParams;
 use glob::glob;
 use nvmeadm::nvmf_subsystem::Subsystem;
 use regex::Regex;
+use tokio::task::spawn_blocking;
 use tracing::warn;
 use udev::{Device, Enumerator};
 use url::Url;
@@ -206,12 +207,17 @@ impl Attach for NvmfAttach {
                     .hostnqn(self.hostnqn.clone())
                     .keep_alive_tmo(self.keep_alive_tmo)
                     .build()?;
-                match ca.connect() {
-                    // Should we remove this arm?
-                    Err(NvmeError::ConnectInProgress) => Ok(()),
-                    Err(err) => Err(err.into()),
-                    Ok(_) => Ok(()),
-                }
+
+                spawn_blocking(move || {
+                    match ca.connect() {
+                        // Should we remove this arm?
+                        Err(NvmeError::ConnectInProgress) => Ok(()),
+                        Err(err) => Err(err.into()),
+                        Ok(_) => Ok(()),
+                    }
+                })
+                .await
+                .map_err(|error| DeviceError::new(&error.to_string()))?
             }
             Err(err) => Err(err.into()),
         }
@@ -295,14 +301,17 @@ impl NvmfDetach {
 #[tonic::async_trait]
 impl Detach for NvmfDetach {
     async fn detach(&self) -> Result<(), DeviceError> {
-        if disconnect(&self.nqn)? == 0 {
-            return Err(DeviceError::from(format!(
+        let nqn = self.nqn.clone();
+        spawn_blocking(move || match disconnect(&nqn) {
+            Ok(0) => Err(DeviceError::from(format!(
                 "nvmf disconnect {} failed: no device found",
-                self.nqn
-            )));
-        }
-
-        Ok(())
+                nqn
+            ))),
+            Err(error) => Err(error.into()),
+            Ok(_) => Ok(()),
+        })
+        .await
+        .map_err(|error| DeviceError::from(error.to_string()))?
     }
 
     fn devname(&self) -> DeviceName {

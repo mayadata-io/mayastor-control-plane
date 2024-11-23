@@ -119,3 +119,12 @@ Feature: CSI node plugin
     Then the mounts become broken
     But the volume should be stageable on a different path
     And the nvme device should have a different controller and namespace
+
+  Scenario: unstaging a unavailable target volume
+    Given a staged volume
+    And the target for the volume is removed
+    When the unstage call is made
+    When a new volume is created and staged
+    Then the newer stage should succeed
+    And the unstage should eventually exit with timeout
+

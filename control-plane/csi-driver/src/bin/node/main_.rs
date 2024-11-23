@@ -4,11 +4,16 @@
 //! of volumes using iscsi/nvmf protocols on the node.
 
 use crate::{
-    error::FsfreezeError,
+    client::AppNodesClientWrapper,
+    error::CsiDriverError,
     fsfreeze::{bin::fsfreeze, FsFreezeOpt},
     identity::Identity,
     k8s::patch_k8s_node,
     mount::probe_filesystems,
+    mount_utils::bin::{
+        flag::{parse_mount_flags, parse_unmount_flags},
+        mount_utils::{mount, unmount},
+    },
     node::{Node, RDMA_CONNECT_CHECK},
     nodeplugin_grpc::NodePluginGrpcServer,
     nodeplugin_nvme::NvmeOperationsSvc,
@@ -20,9 +25,7 @@ use grpc::csi_node_nvme::nvme_operations_server::NvmeOperationsServer;
 use stor_port::platform;
 use utils::tracing_telemetry::{FmtLayer, FmtStyle};
 
-use crate::client::AppNodesClientWrapper;
 use clap::Arg;
-use futures::TryFutureExt;
 use serde_json::json;
 use std::{
     collections::HashMap,
@@ -30,67 +33,11 @@ use std::{
     future::Future,
     io::ErrorKind,
     net::{IpAddr, SocketAddr},
-    pin::Pin,
     str::FromStr,
-    sync::Arc,
-    task::{Context, Poll},
 };
-use tokio::{
-    io::{AsyncRead, AsyncWrite, ReadBuf},
-    net::UnixListener,
-};
-use tonic::transport::{server::Connected, Server};
+use tokio::net::UnixListener;
+use tonic::{codegen::tokio_stream::wrappers::UnixListenerStream, transport::Server};
 use tracing::{debug, error, info};
-
-#[derive(Clone, Debug)]
-pub struct UdsConnectInfo {
-    #[allow(dead_code)]
-    pub peer_addr: Option<Arc<tokio::net::unix::SocketAddr>>,
-    #[allow(dead_code)]
-    pub peer_cred: Option<tokio::net::unix::UCred>,
-}
-
-#[derive(Debug)]
-struct UnixStream(tokio::net::UnixStream);
-
-impl Connected for UnixStream {
-    type ConnectInfo = UdsConnectInfo;
-
-    fn connect_info(&self) -> Self::ConnectInfo {
-        UdsConnectInfo {
-            peer_addr: self.0.peer_addr().ok().map(Arc::new),
-            peer_cred: self.0.peer_cred().ok(),
-        }
-    }
-}
-
-impl AsyncRead for UnixStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.0).poll_read(cx, buf)
-    }
-}
-
-impl AsyncWrite for UnixStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        Pin::new(&mut self.0).poll_write(cx, buf)
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.0).poll_flush(cx)
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.0).poll_shutdown(cx)
-    }
-}
 
 const GRPC_PORT: u16 = 50051;
 
@@ -255,6 +202,61 @@ pub(super) async fn main() -> anyhow::Result<()> {
                         .help("Uuid of the volume to unfreeze")
                 )
         )
+        .subcommand(
+            clap::Command::new("mount")
+                .arg(
+                    Arg::new("source")
+                        .long("source")
+                        .value_name("PATH")
+                        .required(true)
+                        .help("Mount source path")
+                )
+                .arg(
+                    Arg::new("target")
+                        .long("target")
+                        .value_name("PATH")
+                        .required(true)
+                        .help("Mount target path")
+                )
+                .arg(
+                    Arg::new("fstype")
+                        .long("fstype")
+                        .value_name("STRING")
+                        .help("Filesystem type for filesystem volume")
+                )
+                .arg(
+                    Arg::new("data")
+                        .long("data")
+                        .value_name("STRING")
+                        .help("Options to apply for the filesystem on mount")
+                )
+                .arg(
+                    Arg::new("mount-flags")
+                        .long("mount-flags")
+                        .value_name("STRING")
+                        .value_parser(parse_mount_flags)
+                        .required(true)
+                        .help("Mount flags")
+                )
+        )
+        .subcommand(
+            clap::Command::new("unmount")
+                .arg(
+                    Arg::new("target")
+                        .long("target")
+                        .value_name("PATH")
+                        .required(true)
+                        .help("Unmount target path")
+                )
+                .arg(
+                    Arg::new("unmount-flags")
+                        .long("unmount-flags")
+                        .value_name("STRING")
+                        .value_parser(parse_unmount_flags)
+                        .required(true)
+                        .help("Unmount flags")
+                )
+        )
         .get_matches();
     let tags = utils::tracing_telemetry::default_tracing_tags(
         utils::raw_version_str(),
@@ -272,13 +274,44 @@ pub(super) async fn main() -> anyhow::Result<()> {
         match cmd {
             ("fs-freeze", arg_matches) => {
                 let volume_id = arg_matches.get_one::<String>("volume-id").unwrap();
-                fsfreeze(volume_id, FsFreezeOpt::Freeze).await
+                fsfreeze(volume_id, FsFreezeOpt::Freeze)
+                    .await
+                    .map_err(|error| CsiDriverError::Fsfreeze { source: error })
             }
             ("fs-unfreeze", arg_matches) => {
                 let volume_id = arg_matches.get_one::<String>("volume-id").unwrap();
-                fsfreeze(volume_id, FsFreezeOpt::Unfreeze).await
+                fsfreeze(volume_id, FsFreezeOpt::Unfreeze)
+                    .await
+                    .map_err(|error| CsiDriverError::Fsfreeze { source: error })
             }
-            _ => Err(FsfreezeError::InvalidFreezeCommand),
+            ("mount", arg_matches) => {
+                let src_path = arg_matches.get_one::<String>("source").unwrap();
+                let dsc_path = arg_matches.get_one::<String>("target").unwrap();
+                let fstype = arg_matches.get_one::<String>("fstype");
+                let data = arg_matches.get_one::<String>("data");
+                let mnt_flags = arg_matches
+                    .get_one::<sys_mount::MountFlags>("mount-flags")
+                    .unwrap();
+                mount(
+                    src_path.to_string(),
+                    dsc_path.to_string(),
+                    data.cloned(),
+                    *mnt_flags,
+                    fstype.cloned(),
+                )
+                .await
+                .map_err(|error| CsiDriverError::Mount { source: error })
+            }
+            ("unmount", arg_matches) => {
+                let target_path = arg_matches.get_one::<String>("target").unwrap();
+                let unmnt_flags = arg_matches
+                    .get_one::<sys_mount::UnmountFlags>("unmount-flags")
+                    .unwrap();
+                unmount(target_path.to_string(), *unmnt_flags)
+                    .await
+                    .map_err(|error| CsiDriverError::Mount { source: error })
+            }
+            _ => Err(CsiDriverError::InvalidCsiDriverCommand),
         }?;
         return Ok(());
     }
@@ -408,6 +441,7 @@ pub(super) async fn main() -> anyhow::Result<()> {
             registration_enabled
         )
     );
+    info!("Main process terminated!");
     vec![csi, grpc, registration].into_iter().collect()
 }
 
@@ -426,7 +460,7 @@ impl CsiServer {
         )?;
 
         let incoming = {
-            let uds = UnixListener::bind(csi_socket).unwrap();
+            let uds = UnixListener::bind(csi_socket)?;
             info!("CSI plugin bound to {}", csi_socket);
 
             // Change permissions on CSI socket to allow non-privileged clients to access it
@@ -440,12 +474,7 @@ impl CsiServer {
                 debug!("Successfully changed file permissions for CSI socket");
             }
 
-            async_stream::stream! {
-                loop {
-                    let item = uds.accept().map_ok(|(st, _)| UnixStream(st)).await;
-                    yield item;
-                }
-            }
+            UnixListenerStream::new(uds)
         };
 
         let node = Node::new(node_name.into(), node_selector, probe_filesystems());

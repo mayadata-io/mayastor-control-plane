@@ -5,9 +5,9 @@
 
 use crate::{findmnt::get_devicepath, mount};
 use csi_driver::filesystem::FileSystem as Fs;
+use devinfo::{blkid::probe::Probe, mountinfo::MountInfo, DevInfoError};
 
 use anyhow::anyhow;
-use devinfo::{blkid::probe::Probe, mountinfo::MountInfo, DevInfoError};
 use std::{process::Output, str, str::FromStr};
 use tokio::process::Command;
 use tonic::async_trait;
@@ -95,7 +95,7 @@ pub(crate) trait FileSystemOps: Send + Sync {
     /// Get the default mount options along with the user passed options for specific filesystems.
     fn mount_flags(&self, mount_flags: Vec<String>) -> Vec<String>;
     /// Unmount the filesystem if the filesystem uuid and the provided uuid differ.
-    fn unmount_on_fs_id_diff(
+    async fn unmount_on_fs_id_diff(
         &self,
         device_path: &str,
         fs_staging_path: &str,
@@ -146,7 +146,7 @@ impl FileSystemOps for Ext4Fs {
         mount_flags
     }
 
-    fn unmount_on_fs_id_diff(
+    async fn unmount_on_fs_id_diff(
         &self,
         _device_path: &str,
         _fs_staging_path: &str,
@@ -270,13 +270,15 @@ impl FileSystemOps for XFs {
         mount_flags
     }
 
-    fn unmount_on_fs_id_diff(
+    async fn unmount_on_fs_id_diff(
         &self,
         device_path: &str,
         fs_staging_path: &str,
         volume_uuid: &Uuid,
     ) -> Result<(), Error> {
         mount::unmount_on_fs_id_diff(device_path, fs_staging_path, volume_uuid)
+            .await
+            .map_err(|error| error.to_string())
     }
 
     /// Xfs filesystem needs an unmount to clear the log, so that the parameters can be changed.
@@ -288,12 +290,12 @@ impl FileSystemOps for XFs {
         options: &[String],
         volume_uuid: &Uuid,
     ) -> Result<(), Error> {
-        mount::filesystem_mount(device, staging_path, &FileSystem(Fs::Xfs), options).map_err(|error| {
+        mount::filesystem_mount(device, staging_path, &FileSystem(Fs::Xfs), options).await.map_err(|error| {
             format!(
                 "(xfs repairing) Failed to mount device {device} onto {staging_path} for {volume_uuid} : {error}",
             )
         })?;
-        mount::filesystem_unmount(staging_path).map_err(|error| {
+        mount::filesystem_unmount(staging_path).await.map_err(|error| {
             format!(
                 "(xfs repairing) Failed to unmount device {device} from {staging_path} for {volume_uuid} : {error}",
             )
@@ -358,13 +360,13 @@ impl FileSystemOps for BtrFs {
         mount_flags
     }
 
-    fn unmount_on_fs_id_diff(
+    async fn unmount_on_fs_id_diff(
         &self,
         device_path: &str,
         fs_staging_path: &str,
         volume_uuid: &Uuid,
     ) -> Result<(), Error> {
-        mount::unmount_on_fs_id_diff(device_path, fs_staging_path, volume_uuid)
+        mount::unmount_on_fs_id_diff(device_path, fs_staging_path, volume_uuid).await
     }
 
     /// `btrfs check --readonly` is a not a `DANGEROUS OPTION` as it only exists to calm potential
