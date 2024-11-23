@@ -206,6 +206,7 @@ pub(crate) async fn bind_mount(
     let mount = MayastorMount::builder()
         .fstype("none")
         .flags(flags.join(",").as_str())
+        .source(source)
         .target(target)
         .mount()
         .await?;
