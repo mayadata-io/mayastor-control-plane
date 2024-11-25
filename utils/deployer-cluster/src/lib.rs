@@ -204,7 +204,7 @@ impl Cluster {
             Some(opts) => opts,
             None => TimeoutOptions::new()
                 .with_req_timeout(Duration::from_millis(500))
-                .with_max_retries(10),
+                .with_max_retries(20),
         };
         for x in 1 .. timeout_opts.max_retries().unwrap_or_default() {
             match client
