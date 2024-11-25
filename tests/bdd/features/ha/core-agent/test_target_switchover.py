@@ -41,25 +41,9 @@ RULE_REMOVE = "sudo iptables -t filter -D OUTPUT -o {} -d {} -p tcp --dport {} -
 
 
 @pytest.fixture
-def tmp_files():
-    files = []
-    for index in range(0, 2):
-        files.append(f"/tmp/disk_{index}")
-    yield files
-
-
-@pytest.fixture
-def disks(tmp_files):
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
-        with open(disk, "w") as file:
-            file.truncate(100 * 1024 * 1024)
-    # /tmp is mapped into /host/tmp within the io-engine containers
-    yield list(map(lambda file: f"/host{file}", tmp_files))
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
+def disks():
+    yield Deployer.create_disks(2, size=100 * 1024 * 1024)
+    Deployer.cleanup_disks(2)
 
 
 @pytest.fixture(scope="module")

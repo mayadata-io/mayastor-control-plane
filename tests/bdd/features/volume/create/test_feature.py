@@ -59,26 +59,10 @@ def init_scenario(init, disks):
 
 
 @pytest.fixture
-def tmp_files():
-    files = []
-    for index in range(0, 1):
-        files.append(f"/tmp/disk_{index}")
-    yield files
-
-
-@pytest.fixture
-def disks(tmp_files):
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
-        with open(disk, "w") as file:
-            file.truncate(100 * 1024 * 1024)
-    # /tmp is mapped into /host/tmp within the io-engine containers
-    yield list(map(lambda file: f"/host{file}", tmp_files))
-
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
+def disks():
+    pools = Deployer.create_disks(1, size=100 * 1024 * 1024)
+    yield pools
+    Deployer.cleanup_disks(len(pools))
 
 
 # Fixture used to pass the volume create request between test steps.

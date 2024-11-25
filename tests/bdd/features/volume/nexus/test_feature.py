@@ -98,26 +98,14 @@ NUM_VOLUME_REPLICAS = 1
 IO_ENGINE_1 = "io-engine-1"
 IO_ENGINE_2 = "io-engine-2"
 
-POOL_DISK1 = "cdisk1.img"
-POOL1_UUID = "4cc6ee64-7232-497d-a26f-38284a444980"
-POOL_DISK2 = "cdisk2.img"
-POOL2_UUID = "4cc6ee64-7232-497d-a26f-38284a444990"
+POOL_UUID = "4cc6ee64-7232-497d-a26f-38284a444990"
 
 
 @pytest.fixture(scope="function")
 def create_pool_disk_images():
-    # When starting Io-Engine instances with the deployer a bind mount is created from /tmp to
-    # /host/tmp, so create disk images in /tmp
-    for disk in [POOL_DISK1, POOL_DISK2]:
-        path = f"/tmp/{disk}"
-        with open(path, "w") as file:
-            file.truncate(20 * 1024 * 1024)
-
-    yield
-    for disk in [POOL_DISK1, POOL_DISK2]:
-        path = f"/tmp/{disk}"
-        if os.path.exists(path):
-            os.remove(path)
+    pools = Deployer.create_disks(1, size=20 * 1024 * 1024)
+    yield pools
+    Deployer.cleanup_disks(len(pools))
 
 
 @pytest.fixture(scope="function")
@@ -128,8 +116,8 @@ def init(create_pool_disk_images):
     # Create pools
     ApiClient.pools_api().put_node_pool(
         IO_ENGINE_2,
-        POOL2_UUID,
-        CreatePoolBody([f"aio:///host/tmp/{POOL_DISK2}"], labels={"node": IO_ENGINE_2}),
+        POOL_UUID,
+        CreatePoolBody([create_pool_disk_images[0]], labels={"node": IO_ENGINE_2}),
     )
 
     yield

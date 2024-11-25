@@ -648,19 +648,19 @@ impl TmpDiskFileInner {
         disk
     }
     fn make_new(name: &str) -> Self {
-        let path = Self::make_path(name);
+        let (path, container) = Self::make_path(name);
+        let pool_id = PoolId::new();
         Self {
-            // the io-engine is setup with a bind mount from /tmp to /host/tmp
-            uri: format!("aio:///host{}?blk_size=512&uuid={}", path, PoolId::new()),
+            // the io-engine is setup with a bind mount from /workspace/tmp to /host/tmp
+            uri: format!("aio://{container}?blk_size=512&uuid={pool_id}"),
             path,
             cleanup: true,
         }
     }
-    fn make_path(name: &str) -> String {
-        // todo: use known path to facilitate cleanup.
-        // let root = std::env::var("WORKSPACE_ROOT").as_deref().unwrap_or("/tmp");
-        let root = "/tmp";
-        format!("{root}/io-engine-disk-{name}")
+    fn make_path(name: &str) -> (String, String) {
+        let file = format!("io-engine-disk-{name}");
+        let host_tmp = deployer_lib::host_tmp().expect("workspace error");
+        (format!("{host_tmp}/{file}"), format!("/host/tmp/{file}"))
     }
     fn uri(&self) -> &str {
         &self.uri

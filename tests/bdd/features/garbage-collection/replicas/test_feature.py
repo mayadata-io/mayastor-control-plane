@@ -29,26 +29,15 @@ NUM_VOLUME_REPLICAS = 2
 IO_ENGINE_1 = "io-engine-1"
 IO_ENGINE_2 = "io-engine-2"
 
-POOL_DISK1 = "pdisk1.img"
 POOL1_UUID = "4cc6ee64-7232-497d-a26f-38284a444980"
-POOL_DISK2 = "pdisk2.img"
 POOL2_UUID = "4cc6ee64-7232-497d-a26f-38284a444990"
 
 
 @pytest.fixture(scope="function")
 def create_pool_disk_images():
-    # When starting Io-Engine instances with the deployer a bind mount is created from /tmp to
-    # /host/tmp, so create disk images in /tmp
-    for disk in [POOL_DISK1, POOL_DISK2]:
-        path = "/tmp/{}".format(disk)
-        with open(path, "w") as file:
-            file.truncate(20 * 1024 * 1024)
-
-    yield
-    for disk in [POOL_DISK1, POOL_DISK2]:
-        path = "/tmp/{}".format(disk)
-        if os.path.exists(path):
-            os.remove(path)
+    pools = Deployer.create_disks(2, size=20 * 1024 * 1024)
+    yield pools
+    Deployer.cleanup_disks(len(pools))
 
 
 # This fixture will be automatically used by all tests.
@@ -63,12 +52,12 @@ def init(create_pool_disk_images):
     ApiClient.pools_api().put_node_pool(
         IO_ENGINE_1,
         POOL1_UUID,
-        CreatePoolBody(["aio:///host/tmp/{}".format(POOL_DISK1)]),
+        CreatePoolBody(["aio://{}".format(create_pool_disk_images[0])]),
     )
     ApiClient.pools_api().put_node_pool(
         IO_ENGINE_2,
         POOL2_UUID,
-        CreatePoolBody(["aio:///host/tmp/{}".format(POOL_DISK2)]),
+        CreatePoolBody(["aio://{}".format(create_pool_disk_images[1])]),
     )
 
     # Create and publish a volume on node 1

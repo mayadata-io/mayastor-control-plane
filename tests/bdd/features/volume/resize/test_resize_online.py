@@ -62,27 +62,10 @@ VOLUME_SHRINK_SIZE = 52428800  # 50MiB
 
 # fixtures - BEGIN
 @pytest.fixture(scope="module")
-def tmp_files():
-    files = []
-    for itr in range(DEFAULT_REPLICA_CNT + 1):
-        files.append(f"/tmp/node-{itr + 1}-disk")
-    yield files
-
-
-@pytest.fixture(scope="module")
-def disks(tmp_files):
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
-        with open(disk, "w") as file:
-            file.truncate(DEFAULT_POOL_SIZE)
-
-    # /tmp is mapped into /host/tmp within the io-engine containers
-    yield list(map(lambda file: f"/host{file}", tmp_files))
-
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
+def disks():
+    pools = Deployer.create_disks(DEFAULT_REPLICA_CNT + 1, size=DEFAULT_POOL_SIZE)
+    yield pools
+    Deployer.cleanup_disks(len(pools))
 
 
 @pytest.fixture(autouse=True, scope="module")

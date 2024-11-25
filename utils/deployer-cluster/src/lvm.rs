@@ -69,7 +69,7 @@ impl VolGroup {
     /// The output string is returned.
     fn command(args: &[&str]) -> Result<String, anyhow::Error> {
         let cmd = args.first().unwrap();
-        let output = std::process::Command::new("sudo")
+        let output = std::process::Command::new(env!("SUDO"))
             .arg("-E")
             .args(args)
             .output()?;
@@ -94,7 +94,7 @@ impl Drop for VolGroup {
             self.backing_file.path()
         );
 
-        let _ = Self::command(&["vgremove", self.name.as_str(), "-y"]);
+        let _ = Self::command(&["vgremove", "-y", self.name.as_str()]);
         let _ = Self::command(&["losetup", "-d", self.dev_loop.as_str()]);
     }
 }

@@ -1035,16 +1035,16 @@ async fn destroy_after_restart() {
 async fn slow_create() {
     const POOL_SIZE_BYTES: u64 = 128 * 1024 * 1024;
 
-    let vg = deployer_cluster::lvm::VolGroup::new("slow-pool-1", POOL_SIZE_BYTES).unwrap();
+    let vg = deployer_cluster::lvm::VolGroup::new("slow-pool", POOL_SIZE_BYTES).unwrap();
     let lvol = vg.create_lvol("lvol0", POOL_SIZE_BYTES / 2).unwrap();
     lvol.suspend().unwrap();
     {
         let cluster = ClusterBuilder::builder()
             .with_io_engines(1)
-            .with_reconcile_period(Duration::from_secs(2), Duration::from_secs(2))
-            .with_cache_period("1s")
+            .with_reconcile_period(Duration::from_millis(250), Duration::from_millis(250))
+            .with_cache_period("200ms")
             .with_options(|o| o.with_io_engine_devices(vec![lvol.path()]))
-            .with_req_timeouts(Duration::from_secs(2), Duration::from_secs(2))
+            .with_req_timeouts(Duration::from_millis(500), Duration::from_millis(500))
             .compose_build(|b| b.with_clean(true))
             .await
             .unwrap();

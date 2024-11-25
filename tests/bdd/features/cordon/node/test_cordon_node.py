@@ -58,14 +58,6 @@ def init_scenario(init, disks):
     remove_all_cordons(NODE_NAME_2)
 
 
-@pytest.fixture
-def tmp_files():
-    files = []
-    for index in range(0, 1):
-        files.append(f"/tmp/disk_{index}")
-    yield files
-
-
 @pytest.fixture(scope="module")
 def disks():
     yield Deployer.create_disks(2, size=100 * 1024 * 1024)
