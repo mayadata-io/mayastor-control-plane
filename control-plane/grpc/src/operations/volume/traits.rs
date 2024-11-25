@@ -1618,6 +1618,8 @@ pub trait UnpublishVolumeInfo: Send + Sync + std::fmt::Debug {
     fn uuid(&self) -> VolumeId;
     /// Force unpublish
     fn force(&self) -> bool;
+    /// Frontend node requesting unpublish.
+    fn frontend_nodes(&self) -> Vec<String>;
 }
 
 impl UnpublishVolumeInfo for UnpublishVolume {
@@ -1627,6 +1629,10 @@ impl UnpublishVolumeInfo for UnpublishVolume {
 
     fn force(&self) -> bool {
         self.force()
+    }
+
+    fn frontend_nodes(&self) -> Vec<String> {
+        self.frontend_nodes.clone()
     }
 }
 
@@ -1644,6 +1650,10 @@ impl UnpublishVolumeInfo for ValidatedUnpublishVolumeRequest {
     fn force(&self) -> bool {
         self.inner.force
     }
+
+    fn frontend_nodes(&self) -> Vec<String> {
+        self.inner.frontend_nodes.clone()
+    }
 }
 
 impl ValidateRequestTypes for UnpublishVolumeRequest {
@@ -1658,7 +1668,7 @@ impl ValidateRequestTypes for UnpublishVolumeRequest {
 
 impl From<&dyn UnpublishVolumeInfo> for UnpublishVolume {
     fn from(data: &dyn UnpublishVolumeInfo) -> Self {
-        UnpublishVolume::new(&data.uuid(), data.force())
+        UnpublishVolume::new(&data.uuid(), data.force(), data.frontend_nodes())
     }
 }
 
@@ -1667,6 +1677,7 @@ impl From<&dyn UnpublishVolumeInfo> for UnpublishVolumeRequest {
         Self {
             uuid: Some(data.uuid().to_string()),
             force: data.force(),
+            frontend_nodes: data.frontend_nodes().iter().map(|n| n.into()).collect(),
         }
     }
 }

@@ -58,11 +58,15 @@ impl apis::actix_server::Volumes for RestApi {
 
     async fn del_volume_target(
         Path(volume_id): Path<Uuid>,
-        Query(force): Query<Option<bool>>,
+        Query((force, frontend_host)): Query<(Option<bool>, Option<String>)>,
     ) -> Result<models::Volume, RestError<RestJsonError>> {
         let volume = client()
             .unpublish(
-                &UnpublishVolume::new(&volume_id.into(), force.unwrap_or(false)),
+                &UnpublishVolume::new(
+                    &volume_id.into(),
+                    force.unwrap_or(false),
+                    frontend_host.into_iter().collect(),
+                ),
                 None,
             )
             .await?;

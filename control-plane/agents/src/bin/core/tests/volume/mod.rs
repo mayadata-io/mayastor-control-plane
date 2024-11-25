@@ -142,7 +142,10 @@ async fn nexus_persistence_test_iteration(
     let nexus_uuid = nexus.uuid.clone();
 
     volume_client
-        .unpublish(&UnpublishVolume::new(&volume_state.uuid, false), None)
+        .unpublish(
+            &UnpublishVolume::new(&volume_state.uuid, false, vec![]),
+            None,
+        )
         .await
         .unwrap();
 
@@ -379,7 +382,10 @@ async fn publishing_test(cluster: &Cluster) {
         .expect_err("The Volume cannot be published again because it's already published");
 
     volume_client
-        .unpublish(&UnpublishVolume::new(&volume_state.uuid, false), None)
+        .unpublish(
+            &UnpublishVolume::new(&volume_state.uuid, false, vec![]),
+            None,
+        )
         .await
         .unwrap();
 
@@ -447,7 +453,10 @@ async fn publishing_test(cluster: &Cluster) {
         .expect_err("The volume is already published");
 
     volume_client
-        .unpublish(&UnpublishVolume::new(&volume_state.uuid, false), None)
+        .unpublish(
+            &UnpublishVolume::new(&volume_state.uuid, false, vec![]),
+            None,
+        )
         .await
         .unwrap();
 
@@ -491,12 +500,18 @@ async fn publishing_test(cluster: &Cluster) {
     cluster.composer().kill(target_node.as_str()).await.unwrap();
 
     volume_client
-        .unpublish(&UnpublishVolume::new(&volume_state.uuid, false), None)
+        .unpublish(
+            &UnpublishVolume::new(&volume_state.uuid, false, vec![]),
+            None,
+        )
         .await
         .expect_err("The node is not online...");
 
     volume_client
-        .unpublish(&UnpublishVolume::new(&volume_state.uuid, true), None)
+        .unpublish(
+            &UnpublishVolume::new(&volume_state.uuid, true, vec![]),
+            None,
+        )
         .await
         .expect("With force comes great responsibility...");
 
@@ -747,7 +762,10 @@ async fn replica_count_test(cluster: &Cluster) {
 
     let volume_state = volume.state();
     volume_client
-        .unpublish(&UnpublishVolume::new(&volume_state.uuid, false), None)
+        .unpublish(
+            &UnpublishVolume::new(&volume_state.uuid, false, vec![]),
+            None,
+        )
         .await
         .unwrap();
 
@@ -927,7 +945,7 @@ async fn publish_unpublish(cluster: &Cluster) {
     // Unpublish the volume2
     let _ = volume_client
         .unpublish(
-            &UnpublishVolume::new(&VolumeId::try_from(VOLUME_2).unwrap(), false),
+            &UnpublishVolume::new(&VolumeId::try_from(VOLUME_2).unwrap(), false, vec![]),
             None,
         )
         .await
@@ -936,7 +954,7 @@ async fn publish_unpublish(cluster: &Cluster) {
     // Unpublish the volume1
     let _ = volume_client
         .unpublish(
-            &UnpublishVolume::new(&VolumeId::try_from(VOLUME_1).unwrap(), false),
+            &UnpublishVolume::new(&VolumeId::try_from(VOLUME_1).unwrap(), false, vec![]),
             None,
         )
         .await
@@ -983,14 +1001,14 @@ async fn target_distribution(cluster: &Cluster) {
     // Cleanup
     let _ = volume_client
         .unpublish(
-            &UnpublishVolume::new(&VolumeId::try_from(VOLUME_1).unwrap(), false),
+            &UnpublishVolume::new(&VolumeId::try_from(VOLUME_1).unwrap(), false, vec![]),
             None,
         )
         .await
         .expect("The volume should be unpublished");
     let _ = volume_client
         .unpublish(
-            &UnpublishVolume::new(&VolumeId::try_from(VOLUME_2).unwrap(), false),
+            &UnpublishVolume::new(&VolumeId::try_from(VOLUME_2).unwrap(), false, vec![]),
             None,
         )
         .await
@@ -1063,7 +1081,7 @@ async fn offline_node(cluster: &Cluster) {
     // Unpublish volume2
     let _ = volume_client
         .unpublish(
-            &UnpublishVolume::new(&VolumeId::try_from(VOLUME_2).unwrap(), false),
+            &UnpublishVolume::new(&VolumeId::try_from(VOLUME_2).unwrap(), false, vec![]),
             None,
         )
         .await

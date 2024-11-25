@@ -326,7 +326,11 @@ async fn unused_reconcile(cluster: &Cluster) {
     cluster.composer().kill(&nexus_node.id).await.unwrap();
     // 2. now we force unpublish the volume
     volumes_api
-        .del_volume_target(&volume.spec.uuid, Some(true))
+        .del_volume_target(
+            &volume.spec.uuid,
+            Some(true),
+            Some(cluster.csi_node(0).as_str()),
+        )
         .await
         .unwrap();
     // 3. publish on the previously unused node

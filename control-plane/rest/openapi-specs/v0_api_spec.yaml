@@ -1710,6 +1710,13 @@ paths:
           schema:
             type: boolean
             default: false
+        - in: query
+          name: frontend_host
+          description: |-
+            Frontend host requesting the volume unpublish.
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: OK
