@@ -157,6 +157,11 @@ def test_unpublish_volume(setup):
     """unpublish volume"""
 
 
+@scenario("controller.feature", "unpublish volume from non-frontend node")
+def test_unpublish_volume_from_nonfrontend_node(setup):
+    """unpublish volume from non-frontend node."""
+
+
 @scenario("controller.feature", "unpublish volume idempotency")
 def test_unpublish_volume_idempotency(setup):
     """unpublish volume idempotency"""
@@ -199,6 +204,17 @@ def two_nodes_with_one_pool_each():
 @given("2 existing volumes", target_fixture="two_volumes")
 def two_existing_volumes(_create_2_volumes_1_replica):
     return _create_2_volumes_1_replica
+
+
+@given("a 2 replica volume published on a node")
+def populate_published_2_replica_volume(_create_2_replica_nvmf_volume):
+    do_publish_volume(VOLUME4_UUID, NODE1)
+    # Make sure volume is published.
+    volume = ApiClient.volumes_api().get_volume(VOLUME4_UUID)
+    assert (
+        str(volume.spec.target.protocol) == "nvmf"
+    ), "Protocol mismatches for published volume"
+    return volume
 
 
 @given("a non-existing volume")
@@ -578,6 +594,12 @@ def get_controller_capabilities(csi_instance):
     )
 
 
+@when("the ControllerUnpublishVolume request arrives from a non-frontend node")
+def unpublish_from_non_frontend_node():
+    """the ControllerUnpublishVolume request arrives from a non-frontend node."""
+    do_unpublish_volume(VOLUME4_UUID, NODE2)
+
+
 @then("CSI controller should report all its capabilities")
 def check_get_controller_capabilities(get_caps_request):
     all_capabilities = [
@@ -935,6 +957,16 @@ def check_identical_volume_creation(create_the_same_volume):
     )
 
 
+@then("nvmf target which exposes the volume should not be destroyed")
+def volume_target_should_not_be_destroyed():
+    """nvmf target which exposes the volume should not be destroyed."""
+    vol = ApiClient.volumes_api().get_volume(VOLUME4_UUID)
+    assert str(vol.spec.target.protocol) == "nvmf", "Volume protocol mismatches"
+    assert vol.state.target["device_uri"].startswith(
+        ("nvmf://", "nvmf+tcp://", "nvmf+rdma+tcp://")
+    ), "Volume share URI mismatches"
+
+
 @then("only a single volume should be returned")
 def only_a_single_volume_should_be_returned(paginated_volumes_list):
     """only a single volume should be returned."""
@@ -998,6 +1030,12 @@ def check_unpublish_not_existing_volume(unpublish_not_existing_volume):
     assert (
         response == unpublish_not_existing_volume
     ), "Volume unpuplishing succeeded with unexpected response"
+
+
+@then("volume should remain as published")
+def volume_remains_published():
+    """volume should remain as published."""
+    pass
 
 
 @then("volume should report itself as published")

@@ -98,7 +98,7 @@ impl ResourceUpdates for Vec<models::Volume> {
 
             client
                 .volumes_api()
-                .del_volume_target(&volume.spec.uuid, Some(true))
+                .del_volume_target(&volume.spec.uuid, Some(true), Some(node_id.as_str()))
                 .await?;
         }
         Ok(())
