@@ -10,6 +10,7 @@ use stor_port::{
 
 use serde_json::Value;
 use std::str::FromStr;
+use stor_port::transport_api::TimeoutOptions;
 use uuid::Uuid;
 
 /// Test that the content of the registry is correctly loaded from the persistent store on start up.
@@ -289,7 +290,7 @@ async fn etcd_pagination() {
 
     cluster.restart_core().await;
     cluster
-        .volume_service_liveness(None)
+        .volume_service_liveness(Some(TimeoutOptions::new().with_max_retries(10)))
         .await
         .expect("Should have restarted by now");
 
