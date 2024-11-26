@@ -35,26 +35,10 @@ POOL_SIZE = 200 * 1024 * 1024
 
 
 @pytest.fixture(scope="module")
-def tmp_files():
-    files = []
-    for index in range(2):
-        files.append(f"/tmp/disk_{index}")
-    yield files
-
-
-@pytest.fixture(scope="module")
-def disks(tmp_files):
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
-        with open(disk, "w") as file:
-            file.truncate(POOL_SIZE)
-    # /tmp is mapped into /host/tmp within the io-engine containers
-    yield list(map(lambda file: f"/host{file}", tmp_files))
-
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
+def disks():
+    pools = Deployer.create_disks(2, size=POOL_SIZE)
+    yield pools
+    Deployer.cleanup_disks(len(pools))
 
 
 @pytest.fixture(scope="module")

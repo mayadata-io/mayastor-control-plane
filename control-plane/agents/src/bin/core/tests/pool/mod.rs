@@ -21,7 +21,10 @@ use stor_port::{
                 VolumePolicy,
             },
         },
-        store::replica::{ReplicaSpec, ReplicaSpecKey},
+        store::{
+            pool::PoolLabel,
+            replica::{ReplicaSpec, ReplicaSpecKey},
+        },
         transport::{
             CreatePool, CreateReplica, DestroyPool, DestroyReplica, Filter, GetSpecs, NexusId,
             NodeId, Protocol, Replica, ReplicaId, ReplicaName, ReplicaOwners, ReplicaShareProtocol,
@@ -1026,4 +1029,85 @@ async fn destroy_after_restart() {
     let pool = client.pool().create(&create, None).await.unwrap();
 
     assert_eq!(pool.state().unwrap().id, create.id);
+}
+
+#[tokio::test]
+async fn slow_create() {
+    const POOL_SIZE_BYTES: u64 = 128 * 1024 * 1024;
+
+    let vg = deployer_cluster::lvm::VolGroup::new("slow-pool", POOL_SIZE_BYTES).unwrap();
+    let lvol = vg.create_lvol("lvol0", POOL_SIZE_BYTES / 2).unwrap();
+    lvol.suspend().unwrap();
+    {
+        let cluster = ClusterBuilder::builder()
+            .with_io_engines(1)
+            .with_reconcile_period(Duration::from_millis(250), Duration::from_millis(250))
+            .with_cache_period("200ms")
+            .with_options(|o| o.with_io_engine_devices(vec![lvol.path()]))
+            .with_req_timeouts(Duration::from_millis(500), Duration::from_millis(500))
+            .compose_build(|b| b.with_clean(true))
+            .await
+            .unwrap();
+
+        let client = cluster.grpc_client();
+
+        let create = CreatePool {
+            node: cluster.node(0),
+            id: "bob".into(),
+            disks: vec![lvol.path().into()],
+            labels: Some(PoolLabel::from([("a".into(), "b".into())])),
+        };
+
+        let error = client
+            .pool()
+            .create(&create, None)
+            .await
+            .expect_err("device suspended");
+        assert_eq!(error.kind, ReplyErrorKind::Cancelled);
+
+        lvol.resume().unwrap();
+
+        let start = std::time::Instant::now();
+        let timeout = Duration::from_secs(30);
+        loop {
+            if std::time::Instant::now() > (start + timeout) {
+                panic!("Timeout waiting for the pool");
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+
+            let pools = client
+                .pool()
+                .get(Filter::Pool(create.id.clone()), None)
+                .await
+                .unwrap();
+
+            let Some(pool) = pools.0.first() else {
+                continue;
+            };
+            let Some(pool_spec) = pool.spec() else {
+                continue;
+            };
+            if !pool_spec.status.created() {
+                continue;
+            }
+            break;
+        }
+        let destroy = DestroyPool::from(create.clone());
+        client.pool().destroy(&destroy, None).await.unwrap();
+
+        // Now we try to recreate using an API call, rather than using the reconciler
+        lvol.suspend().unwrap();
+
+        let error = client
+            .pool()
+            .create(&create, None)
+            .await
+            .expect_err("device suspended");
+        assert_eq!(error.kind, ReplyErrorKind::Cancelled);
+
+        lvol.resume().unwrap();
+
+        let pool = client.pool().create(&create, None).await.unwrap();
+        assert!(pool.spec().unwrap().status.created());
+    }
 }

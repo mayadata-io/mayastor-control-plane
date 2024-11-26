@@ -444,11 +444,14 @@ pub enum ReplyErrorKind {
     InUse,
     CapacityLimitExceeded,
     NotAcceptable,
+    Cancelled,
 }
 
 impl From<tonic::Code> for ReplyErrorKind {
     fn from(code: tonic::Code) -> Self {
         match code {
+            Code::Ok => Self::Internal,
+            Code::Unknown => Self::Internal,
             Code::InvalidArgument => Self::InvalidArgument,
             Code::DeadlineExceeded => Self::DeadlineExceeded,
             Code::NotFound => Self::NotFound,
@@ -463,7 +466,7 @@ impl From<tonic::Code> for ReplyErrorKind {
             Code::Unavailable => Self::Unavailable,
             Code::DataLoss => Self::FailedPersist,
             Code::Unauthenticated => Self::Unauthenticated,
-            _ => Self::Aborted,
+            Code::Cancelled => Self::Cancelled,
         }
     }
 }

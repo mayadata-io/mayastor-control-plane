@@ -143,7 +143,6 @@ def the_pool_should_be_deleted(pool, attempt_delete_the_pool):
 
 """" Implementations """
 
-POOLS_PER_NODE = 2
 VOLUME_UUID = "5cd5378e-3f05-47f1-a830-a0f5873a1449"
 VOLUME_SIZE = 10485761
 
@@ -161,32 +160,10 @@ def nodes():
 
 
 @pytest.fixture
-def tmp_files(nodes):
-    files = []
-    for node in range(len(nodes)):
-        node_files = []
-        for disk in range(0, POOLS_PER_NODE + 1):
-            node_files.append(f"/tmp/node-{node}-disk_{disk}")
-        files.append(node_files)
-    yield files
-
-
-@pytest.fixture
-def node_disks(tmp_files):
-    for node_disks in tmp_files:
-        for disk in node_disks:
-            if os.path.exists(disk):
-                os.remove(disk)
-            with open(disk, "w") as file:
-                file.truncate(100 * 1024 * 1024)
-
-    # /tmp is mapped into /host/tmp within the io-engine containers
-    yield list(map(lambda arr: list(map(lambda file: f"/host{file}", arr)), tmp_files))
-
-    for node_disks in tmp_files:
-        for disk in node_disks:
-            if os.path.exists(disk):
-                os.remove(disk)
+def node_disks(nodes):
+    pools = Deployer.create_disks(1, size=100 * 1024 * 1024)
+    yield pools
+    Deployer.cleanup_disks(len(pools))
 
 
 @pytest.fixture
@@ -202,9 +179,8 @@ def pool(node_disks, nodes):
     assert len(nodes) > 0
     assert len(node_disks) > 0
     node = nodes[0]
-    disks = node_disks[0]
     pool = ApiClient.pools_api().put_node_pool(
-        node.id, f"{node.id}-pool", CreatePoolBody([disks[0]])
+        node.id, f"{node.id}-pool", CreatePoolBody([node_disks[0]])
     )
     yield pool
 

@@ -786,3 +786,12 @@ impl std::fmt::Debug for ClusterLabel {
         write!(f, "{self}")
     }
 }
+
+/// Get the host tmp folder for this workspace.
+pub fn host_tmp() -> Result<String, std::io::Error> {
+    let root_tmp = format!("{root}/.tmp", root = env!("WORKSPACE_ROOT"));
+    if !std::path::Path::new(&root_tmp).exists() {
+        std::fs::create_dir(&root_tmp)?;
+    }
+    Ok(root_tmp)
+}

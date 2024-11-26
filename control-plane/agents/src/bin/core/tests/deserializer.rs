@@ -152,6 +152,7 @@ fn test_deserialization_v1_to_v2() {
                 },
                 sequencer: Default::default(),
                 operation: None,
+                creat_tsc: None,
             }),
         },
         TestEntry {

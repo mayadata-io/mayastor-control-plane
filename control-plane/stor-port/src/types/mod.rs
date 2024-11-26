@@ -142,6 +142,10 @@ impl From<ReplyError> for RestError<RestJsonError> {
                 let error = RestJsonError::new(details, message, Kind::NotAcceptable);
                 (StatusCode::NOT_ACCEPTABLE, error)
             }
+            ReplyErrorKind::Cancelled => {
+                let error = RestJsonError::new(details, message, Kind::Cancelled);
+                (StatusCode::GATEWAY_TIMEOUT, error)
+            }
         };
 
         RestError::new(status, error)

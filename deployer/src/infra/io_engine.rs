@@ -11,6 +11,7 @@ use utils::DEFAULT_GRPC_CLIENT_ADDR;
 impl ComponentAction for IoEngine {
     fn configure(&self, options: &StartOptions, cfg: Builder) -> Result<Builder, Error> {
         let mut cfg = cfg;
+        let host_tmp = crate::host_tmp()?;
         for i in 0 .. options.io_engines + options.idle_io_engines {
             let io_engine_socket =
                 format!("{}:10124", cfg.next_ip_for_name(&Self::name(i, options))?);
@@ -53,7 +54,7 @@ impl ComponentAction for IoEngine {
             .with_env("NEXUS_NVMF_ANA_ENABLE", "1")
             .with_env("NVMF_TGT_CRDT", "0")
             .with_env("ENABLE_SNAPSHOT_REBUILD", "true")
-            .with_bind("/tmp", "/host/tmp")
+            .with_bind(&host_tmp, "/host/tmp")
             .with_bind("/var/run/dpdk", "/var/run/dpdk");
 
             let core_list = match options.io_engine_isolate {

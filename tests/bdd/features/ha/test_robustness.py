@@ -240,25 +240,10 @@ def the_volume_target_node_has_iopath_fixed():
 
 
 @pytest.fixture
-def tmp_files():
-    files = []
-    for index in range(0, 2):
-        files.append(f"/tmp/disk_{index}")
-    yield files
-
-
-@pytest.fixture
-def disks(tmp_files):
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
-        with open(disk, "w") as file:
-            file.truncate(POOL_SIZE)
-    # /tmp is mapped into /host/tmp within the io-engine containers
-    yield list(map(lambda file: f"/host{file}", tmp_files))
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
+def disks():
+    pools = Deployer.create_disks(2, size=POOL_SIZE)
+    yield pools
+    Deployer.cleanup_disks(len(pools))
 
 
 @pytest.fixture

@@ -77,15 +77,9 @@ def test_volume_snapshots_list_involving_disrupted_node():
 
 @pytest.fixture(scope="module")
 def create_pool_disk_images():
-    # Create the file.
-    path = "/tmp/{}".format(POOL_DISK1)
-    with open(path, "w") as file:
-        file.truncate(800 * 1024 * 1024)
-
-    yield
-    # Clear the file
-    if os.path.exists(path):
-        os.remove(path)
+    pools = Deployer.create_disks(1, size=800 * 1024 * 1024)
+    yield pools
+    Deployer.cleanup_disks(len(pools))
 
 
 @pytest.fixture(scope="module")
@@ -98,7 +92,7 @@ def setup(create_pool_disk_images):
     ApiClient.pools_api().put_node_pool(
         NODE1,
         POOL1_NAME,
-        CreatePoolBody(["aio:///host/tmp/{}".format(POOL_DISK1)]),
+        CreatePoolBody(["aio://{}".format(create_pool_disk_images[0])]),
     )
     pytest.exception = None
     yield
