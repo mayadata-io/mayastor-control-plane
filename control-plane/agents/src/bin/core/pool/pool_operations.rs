@@ -65,8 +65,7 @@ impl ResourceLifecycle for OperationGuardArc<PoolSpec> {
         let _ = pool.start_create(registry, request).await?;
 
         let result = node.create_pool(request).await;
-        let on_fail = OnCreateFail::eeinval_delete(&result);
-
+        let on_fail = OnCreateFail::on_pool_create_err(&result);
         let state = pool.complete_create(result, registry, on_fail).await?;
         let spec = pool.lock().clone();
         Ok(Pool::new(spec, Some(CtrlPoolState::new(state))))
@@ -93,14 +92,11 @@ impl ResourceLifecycle for OperationGuardArc<PoolSpec> {
             Err(SvcError::PoolNotFound { .. }) => {
                 match node.import_pool(&self.as_ref().into()).await {
                     Ok(_) => node.destroy_pool(request).await,
-                    Err(error)
-                        if allow_not_found
-                            && error.tonic_code() == tonic::Code::InvalidArgument =>
-                    {
-                        Ok(())
-                    }
-                    Err(error) if error.tonic_code() == tonic::Code::InvalidArgument => Ok(()),
-                    Err(error) => Err(error),
+                    Err(error) => match error.tonic_code() {
+                        tonic::Code::NotFound if allow_not_found => Ok(()),
+                        tonic::Code::InvalidArgument => Ok(()),
+                        _other => Err(error),
+                    },
                 }
             }
             Err(error) => Err(error),

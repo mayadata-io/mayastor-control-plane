@@ -208,16 +208,7 @@ def the_faulted_replica_is_relocated_to_another_pool_with_sufficient_free_space(
 @then("the new replica allocation equals the volume allocation")
 def the_new_replica_allocation_equals_the_volume_allocation():
     """the new replica allocation equals the volume allocation."""
-    volume = ApiClient.volumes_api().get_volume(pytest.volume.spec.uuid)
-    total_allocated = 0
-
-    for replica in volume.state.replica_topology.values():
-        assert replica.usage.capacity == volume.state.usage.capacity
-        assert replica.usage.allocated == volume.state.usage.allocated
-        total_allocated += replica.usage.allocated
-
-    assert volume.state.usage.total_allocated == total_allocated
-    assert volume.state.usage.allocated > 10 * 1024 * 1024 + 4 * 1024 * 1024
+    wait_volume_replica_allocated(pytest.volume)
 
 
 @then("the total number of healthy replicas is restored")
@@ -306,3 +297,16 @@ def wait_volume_new_replica(volume, prev_replicas):
         )
     )
     assert len(new_replicas) == 1
+
+
+@retry(wait_fixed=200, stop_max_attempt_number=20)
+def wait_volume_replica_allocated(volume):
+    volume = ApiClient.volumes_api().get_volume(volume.spec.uuid)
+    total_allocated = 0
+    for replica in volume.state.replica_topology.values():
+        assert replica.usage.capacity == volume.state.usage.capacity
+        assert replica.usage.allocated == volume.state.usage.allocated
+        total_allocated += replica.usage.allocated
+
+    assert volume.state.usage.total_allocated == total_allocated
+    assert volume.state.usage.allocated > 10 * 1024 * 1024 + 4 * 1024 * 1024

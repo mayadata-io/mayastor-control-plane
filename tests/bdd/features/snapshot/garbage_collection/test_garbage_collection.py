@@ -39,15 +39,9 @@ def test_garbage_collection_for_stuck_creating_snapshots_when_source_is_deleted(
 
 @pytest.fixture(scope="module")
 def create_pool_disk_images():
-    # Create the file.
-    path = "/tmp/{}".format(POOL_DISK1)
-    with open(path, "w") as file:
-        file.truncate(100 * 1024 * 1024)
-
-    yield
-    # Clear the file
-    if os.path.exists(path):
-        os.remove(path)
+    pools = Deployer.create_disks(1, size=100 * 1024 * 1024)
+    yield pools
+    Deployer.cleanup_disks(len(pools))
 
 
 @pytest.fixture(scope="module")
@@ -63,7 +57,7 @@ def setup(create_pool_disk_images):
     ApiClient.pools_api().put_node_pool(
         NODE1,
         POOL1_NAME,
-        CreatePoolBody(["aio:///host/tmp/{}".format(POOL_DISK1)]),
+        CreatePoolBody(["aio://{}".format(create_pool_disk_images[0])]),
     )
     pytest.exception = None
     yield

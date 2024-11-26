@@ -97,6 +97,7 @@ impl TryFrom<pool::PoolDefinition> for PoolSpec {
             },
             sequencer: Default::default(),
             operation: None,
+            creat_tsc: None,
         })
     }
 }

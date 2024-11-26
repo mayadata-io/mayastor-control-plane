@@ -54,9 +54,9 @@ enum SpecError {
 }
 
 /// What to do when creation fails.
+#[derive(Debug)]
 pub(crate) enum OnCreateFail {
     /// Leave object as `Creating`, could allow for frontend retries.
-    #[allow(unused)]
     LeaveAsIs,
     /// When frontend retries don't make sense, set it to deleting so we can clean-up.
     SetDeleting,
@@ -71,7 +71,28 @@ impl OnCreateFail {
     pub(crate) fn eeinval_delete<O>(result: &Result<O, SvcError>) -> Self {
         match result {
             Err(error) if error.tonic_code() == tonic::Code::InvalidArgument => Self::Delete,
-            Err(error) if error.tonic_code() == tonic::Code::NotFound => Self::Delete,
+            _ => Self::SetDeleting,
+        }
+    }
+    /// Map errors into `Self` for pool creation requests, specifically.
+    pub(crate) fn on_pool_create_err<O>(result: &Result<O, SvcError>) -> Self {
+        let Err(ref error) = result else {
+            // nonsensical but that's how the api is today...
+            return Self::SetDeleting;
+        };
+        match error.tonic_code() {
+            // 1. the disk is open by another pool or bdev
+            // 2. the disk contains a pool with another name
+            tonic::Code::InvalidArgument => Self::Delete,
+            // 1. the pool disk is not available (ie not found or broken somehow)
+            tonic::Code::NotFound => Self::Delete,
+            // In this case, it's the pool operator's job to attempt re-creation of the pool.
+            // 1. pre-2.6 dataplane, contention on the pool service
+            // 2. pool disk is very slow or extremely large
+            // 3. dataplane core is shared with other processes
+            // TODO: use higher timeout on larger pool sizes or potentially make this
+            //  an async operation.
+            tonic::Code::Cancelled => Self::LeaveAsIs,
             _ => Self::SetDeleting,
         }
     }

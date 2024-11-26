@@ -45,10 +45,13 @@ fi
 
 sudo mkdir -p /etc/apt/keyrings/
 KUBE_APT_V=$(echo "${kube_version}" | awk -F. '{ sub(/-.*/, ""); print "v" $1 "." $2 }')
-curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBE_APT_V/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
+[ -f /etc/apt/keyrings/kubernetes-apt-keyring.gpg ] && sudo rm /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+if ! grep "kubernetes-apt-keyring.gpg" /etc/apt/sources.list.d/kubernetes.list; then
+  cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
 deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBE_APT_V/deb/ /
 EOF
+fi
 
 sudo apt-get update
 

@@ -35,6 +35,7 @@ NODE_NAME = "io-engine-1"
 @pytest.fixture(autouse=True)
 def init(disks):
     Deployer.start(1)
+    Deployer.create_disks(1, POOL_SIZE)
     ApiClient.pools_api().put_node_pool(
         NODE_NAME, POOL_UUID, CreatePoolBody([f"{disks[0]}"])
     )
@@ -48,26 +49,9 @@ def init(disks):
 
 
 @pytest.fixture
-def tmp_files():
-    files = []
-    for index in range(0, 1):
-        files.append(f"/tmp/disk_{index}")
-    yield files
-
-
-@pytest.fixture
-def disks(tmp_files):
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
-        with open(disk, "w") as file:
-            file.truncate(POOL_SIZE)
-    # /tmp is mapped into /host/tmp within the io-engine containers
-    yield list(map(lambda file: f"/host{file}", tmp_files))
-
-    for disk in tmp_files:
-        if os.path.exists(disk):
-            os.remove(disk)
+def disks():
+    yield Deployer.create_disks(1, size=POOL_SIZE)
+    Deployer.cleanup_disks(1)
 
 
 @pytest.fixture(scope="function")

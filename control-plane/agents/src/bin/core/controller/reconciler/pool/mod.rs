@@ -53,6 +53,7 @@ impl TaskPoller for PoolReconciler {
             results.push(Self::squash_results(vec![
                 pool.garbage_collect(context).await,
                 pool.recreate_state(context).await,
+                retry_create_pool_reconciler(&mut pool, context).await,
             ]))
         }
         capacity::remove_larger_replicas(context.registry()).await;
@@ -213,4 +214,13 @@ async fn deleting_pool_spec_reconciler(
         request.reconcile = true
     ))
     .await
+}
+
+#[tracing::instrument(skip(pool, context), level = "trace", fields(pool.id = %pool.id(), request.reconcile = true))]
+async fn retry_create_pool_reconciler(
+    pool: &mut OperationGuardArc<PoolSpec>,
+    context: &PollContext,
+) -> PollResult {
+    pool.retry_creating(context.registry()).await?;
+    Ok(PollerState::Idle)
 }
