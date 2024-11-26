@@ -53,6 +53,17 @@ impl From<&CreatePool> for PoolSpec {
             labels: request.labels.clone(),
             sequencer: OperationSequence::new(),
             operation: None,
+            creat_tsc: None,
+        }
+    }
+}
+impl From<&PoolSpec> for CreatePool {
+    fn from(pool: &PoolSpec) -> Self {
+        Self {
+            node: pool.node.clone(),
+            id: pool.id.clone(),
+            disks: pool.disks.clone(),
+            labels: pool.labels.clone(),
         }
     }
 }
@@ -61,6 +72,7 @@ impl PartialEq<CreatePool> for PoolSpec {
         let mut other = PoolSpec::from(other);
         other.status = self.status.clone();
         other.sequencer = self.sequencer.clone();
+        other.creat_tsc = self.creat_tsc;
         &other == self
     }
 }
@@ -83,6 +95,9 @@ pub struct PoolSpec {
     pub sequencer: OperationSequence,
     /// Record of the operation in progress
     pub operation: Option<PoolOperationState>,
+    /// Last modification timestamp.
+    #[serde(skip)]
+    pub creat_tsc: Option<std::time::SystemTime>,
 }
 
 impl PoolSpec {
@@ -206,6 +221,9 @@ impl SpecTransaction<PoolOperation> for PoolSpec {
     }
 
     fn start_op(&mut self, operation: PoolOperation) {
+        if matches!(operation, PoolOperation::Create) && self.creat_tsc.is_none() {
+            self.creat_tsc = Some(std::time::SystemTime::now());
+        }
         self.operation = Some(PoolOperationState {
             operation,
             result: None,

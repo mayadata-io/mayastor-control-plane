@@ -50,6 +50,7 @@ mkShell {
     pytest_inputs
     tini
     udev
+    lvm2
   ] ++ pkgs.lib.optional (system == "aarch64-darwin") darwin.apple_sdk.frameworks.Security;
 
   LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
@@ -87,6 +88,7 @@ mkShell {
     [ ! -z "${io-engine}" ] && cowsay "${io-engine-moth}"
     [ ! -z "${io-engine}" ] && export IO_ENGINE_BIN="${io-engine-moth}"
     export PATH="$PATH:$(pwd)/target/debug"
+    export SUDO=$(which sudo || echo /run/wrappers/bin/sudo)
 
     DOCKER_CONFIG=~/.docker/config.json
     if [ -f "$DOCKER_CONFIG" ]; then

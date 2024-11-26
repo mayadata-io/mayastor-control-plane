@@ -425,7 +425,9 @@ impl ResourceSpecsLocked {
         let pools = self.pools_rsc();
         for pool in pools {
             if let Ok(mut guard) = pool.operation_guard() {
-                if !guard.handle_incomplete_ops(registry).await {
+                let on_fail = guard.on_create_fail(registry);
+
+                if !guard.handle_incomplete_ops_ext(registry, on_fail).await {
                     // Not all pending operations could be handled.
                     pending_ops = true;
                 }

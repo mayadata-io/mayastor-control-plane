@@ -86,6 +86,11 @@ pub(crate) struct RegistryInner<S: Store> {
     /// The duration for which the reconciler waits for the replica to
     /// to be healthy again before attempting to online the faulted child.
     faulted_child_wait_period: Option<std::time::Duration>,
+    /// When the pool creation gRPC times out, the actual call in the io-engine
+    /// may still progress.
+    /// We wait up to this period before considering the operation a failure and
+    /// GC'ing the pool.
+    pool_async_creat_tmo: std::time::Duration,
     /// Disable partial rebuild for volume targets.
     disable_partial_rebuild: bool,
     /// Disable nvmf target access control gates.
@@ -122,6 +127,7 @@ impl Registry {
         reconcile_period: std::time::Duration,
         reconcile_idle_period: std::time::Duration,
         faulted_child_wait_period: Option<std::time::Duration>,
+        pool_async_creat_tmo: std::time::Duration,
         disable_partial_rebuild: bool,
         disable_target_acc: bool,
         max_rebuilds: Option<NumRebuilds>,
@@ -165,6 +171,7 @@ impl Registry {
                 reconcile_period,
                 reconcile_idle_period,
                 faulted_child_wait_period,
+                pool_async_creat_tmo,
                 disable_partial_rebuild,
                 disable_target_acc,
                 reconciler: ReconcilerControl::new(),
@@ -297,6 +304,10 @@ impl Registry {
     /// Wait period before attempting to online a faulted child.
     pub(crate) fn faulted_child_wait_period(&self) -> Option<std::time::Duration> {
         self.faulted_child_wait_period
+    }
+    /// Allow for this given time before assuming failure and allowing the pool to get deleted.
+    pub(crate) fn pool_async_creat_tmo(&self) -> std::time::Duration {
+        self.pool_async_creat_tmo
     }
     /// The maximum number of concurrent create volume requests.
     pub(crate) fn create_volume_limit(&self) -> usize {

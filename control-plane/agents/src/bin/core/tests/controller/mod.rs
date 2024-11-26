@@ -9,7 +9,7 @@ use stor_port::{
 };
 
 use serde_json::Value;
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 use uuid::Uuid;
 
 /// Test that the content of the registry is correctly loaded from the persistent store on start up.
@@ -227,6 +227,7 @@ async fn etcd_pagination() {
         .with_rest(false)
         .with_jaeger(false)
         .with_store_lease_ttl(lease_ttl)
+        .with_req_timeouts(Duration::from_millis(200), Duration::from_millis(200))
         .build()
         .await
         .unwrap();

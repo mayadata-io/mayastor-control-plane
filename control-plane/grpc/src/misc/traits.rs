@@ -102,6 +102,7 @@ impl From<ReplyErrorKind> for common::ReplyErrorKind {
             ReplyErrorKind::InUse => Self::InUse,
             ReplyErrorKind::CapacityLimitExceeded => Self::CapacityLimitExceeded,
             ReplyErrorKind::NotAcceptable => Self::NotAcceptable,
+            ReplyErrorKind::Cancelled => Self::Cancelled,
         }
     }
 }
@@ -141,6 +142,7 @@ impl From<common::ReplyErrorKind> for ReplyErrorKind {
             common::ReplyErrorKind::InUse => Self::InUse,
             common::ReplyErrorKind::CapacityLimitExceeded => Self::CapacityLimitExceeded,
             common::ReplyErrorKind::NotAcceptable => Self::NotAcceptable,
+            common::ReplyErrorKind::Cancelled => Self::Cancelled,
         }
     }
 }

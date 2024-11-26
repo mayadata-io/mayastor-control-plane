@@ -3253,6 +3253,7 @@ components:
             - InUse
             - CapacityLimitExceeded
             - NotAcceptable
+            - Cancelled
       required:
         - details
         - kind

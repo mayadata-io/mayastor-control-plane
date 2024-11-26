@@ -1124,7 +1124,7 @@ fn grpc_to_reply_error(error: SvcError) -> ReplyError {
         } => {
             let kind = match source.code() {
                 Code::Ok => ReplyErrorKind::Internal,
-                Code::Cancelled => ReplyErrorKind::Internal,
+                Code::Cancelled => ReplyErrorKind::Cancelled,
                 Code::Unknown => ReplyErrorKind::Internal,
                 Code::InvalidArgument => ReplyErrorKind::InvalidArgument,
                 Code::DeadlineExceeded => ReplyErrorKind::DeadlineExceeded,

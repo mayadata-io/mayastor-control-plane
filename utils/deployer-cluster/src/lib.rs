@@ -1,3 +1,4 @@
+pub mod lvm;
 pub mod rest_client;
 
 use composer::{Builder, ComposeTest};
@@ -202,7 +203,7 @@ impl Cluster {
             Some(opts) => opts,
             None => TimeoutOptions::new()
                 .with_req_timeout(Duration::from_millis(500))
-                .with_max_retries(10),
+                .with_max_retries(20),
         };
         for x in 1 .. timeout_opts.max_retries().unwrap_or_default() {
             match client
@@ -619,6 +620,10 @@ impl TmpDiskFile {
     pub fn uri(&self) -> &str {
         self.inner.uri()
     }
+    /// Disk path on the host.
+    pub fn path(&self) -> &str {
+        &self.inner.path
+    }
 
     /// Get the inner disk if there are no other references to it.
     pub fn into_inner(self) -> Result<TmpDiskFileInner, Arc<TmpDiskFileInner>> {
@@ -633,20 +638,19 @@ impl TmpDiskFileInner {
         disk
     }
     fn make_new(name: &str) -> Self {
-        let path = Self::make_path(name);
+        let (path, container) = Self::make_path(name);
+        let pool_id = PoolId::new();
         Self {
-            // the io-engine is setup with a bind mount from /tmp to /host/tmp
-            uri: format!(
-                "aio:///host{}?blk_size=512&uuid={}",
-                path,
-                transport::PoolId::new()
-            ),
+            // the io-engine is setup with a bind mount from /workspace/tmp to /host/tmp
+            uri: format!("aio://{container}?blk_size=512&uuid={pool_id}"),
             path,
             cleanup: true,
         }
     }
-    fn make_path(name: &str) -> String {
-        format!("/tmp/io-engine-disk-{name}")
+    fn make_path(name: &str) -> (String, String) {
+        let file = format!("io-engine-disk-{name}");
+        let host_tmp = deployer_lib::host_tmp().expect("workspace error");
+        (format!("{host_tmp}/{file}"), format!("/host/tmp/{file}"))
     }
     fn uri(&self) -> &str {
         &self.uri

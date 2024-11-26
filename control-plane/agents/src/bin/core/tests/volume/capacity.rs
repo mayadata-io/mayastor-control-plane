@@ -89,7 +89,7 @@ struct DeviceDisconnect(nvmeadm::NvmeTarget);
 impl Drop for DeviceDisconnect {
     fn drop(&mut self) {
         if self.0.disconnect().is_err() {
-            std::process::Command::new("sudo")
+            std::process::Command::new(env!("SUDO"))
                 .args(["nvme", "disconnect-all"])
                 .status()
                 .unwrap();

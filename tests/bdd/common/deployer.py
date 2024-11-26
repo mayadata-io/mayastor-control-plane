@@ -177,18 +177,21 @@ class Deployer(object):
 
     @staticmethod
     def create_disks(len=1, size=100 * 1024 * 1024):
-        disks = list(map(lambda x: f"/tmp/disk_{x}.img", range(1, len + 1)))
+        host_tmp = workspace_tmp()
+        disks = list(map(lambda x: f"disk_{x}.img", range(1, len + 1)))
         for disk in disks:
+            disk = f"{host_tmp}/{disk}"
             if os.path.exists(disk):
                 os.remove(disk)
             with open(disk, "w") as file:
                 file.truncate(size)
         # /tmp is mapped into /host/tmp within the io-engine containers
-        return list(map(lambda file: f"/host{file}", disks))
+        return list(map(lambda file: f"/host/tmp/{file}", disks))
 
     @staticmethod
     def delete_disks(len=1):
-        disks = list(map(lambda x: f"/tmp/disk_{x}.img", range(1, len + 1)))
+        host_tmp = workspace_tmp()
+        disks = list(map(lambda x: f"{host_tmp}/disk_{x}.img", range(1, len + 1)))
         for disk in disks:
             if os.path.exists(disk):
                 os.remove(disk)
@@ -205,3 +208,10 @@ class Deployer(object):
     @staticmethod
     def restart_node(node_name):
         Docker.restart_container(node_name)
+
+
+def workspace_tmp():
+    root = os.getenv("WORKSPACE_ROOT")
+    path = f"{root}/.tmp"
+    os.makedirs(path, exist_ok=True)
+    return path
