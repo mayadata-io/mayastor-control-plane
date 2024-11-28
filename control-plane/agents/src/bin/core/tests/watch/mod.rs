@@ -65,7 +65,7 @@ async fn setup_watch(client: &dyn VolumeOperations) -> (Volume, tokio::sync::mps
 
 async fn callback_server_liveness(uri: &str) {
     let sa = SocketAddr::from_str(uri).unwrap();
-    for _ in 0 .. 25 {
+    for _ in 0..25 {
         if TcpStream::connect(&sa).await.is_ok() {
             return;
         }

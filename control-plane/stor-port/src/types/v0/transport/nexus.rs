@@ -358,7 +358,7 @@ impl NvmfControllerIdRange {
     pub fn new_min(width: u16) -> Self {
         let min = *Self::controller_id_range().start();
         let max = Self::end_from_min(min, width);
-        Self(min ..= max)
+        Self(min..=max)
     }
     fn end_from_min(min: u16, width: u16) -> u16 {
         let width = width.min(*Self::controller_id_range().end());
@@ -375,7 +375,7 @@ impl NvmfControllerIdRange {
         let min = *Self::controller_id_range().start();
         let max = *Self::controller_id_range().end();
         let rand_min = u16::min(rand::random::<u16>() + min, max);
-        Self(rand_min ..= max)
+        Self(rand_min..=max)
     }
     /// minimum controller id
     pub fn min(&self) -> &u16 {
@@ -388,7 +388,7 @@ impl NvmfControllerIdRange {
     fn controller_id_range() -> std::ops::RangeInclusive<u16> {
         const MIN_CONTROLLER_ID: u16 = 1;
         const MAX_CONTROLLER_ID: u16 = 0xffef;
-        MIN_CONTROLLER_ID ..= MAX_CONTROLLER_ID
+        MIN_CONTROLLER_ID..=MAX_CONTROLLER_ID
     }
     /// create a new NvmfControllerIdRange using provided range
     pub fn new(start: u16, end: u16) -> Result<Self, ReplyError> {

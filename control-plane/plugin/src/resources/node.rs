@@ -716,7 +716,7 @@ impl Label for Node {
             }
         } else {
             snafu::ensure!(label.len() >= 2 && label.ends_with('-'), LabelAssignSnafu);
-            let key = &label[.. label.len() - 1];
+            let key = &label[..label.len() - 1];
             validate_topology_key(key)?;
             match RestClient::client()
                 .nodes_api()

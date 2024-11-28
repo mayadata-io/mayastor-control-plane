@@ -76,7 +76,7 @@ async fn upgrade() {
 
     tracing::info!("First controller is {path_number}");
     let mut drain_node = 99;
-    for _ in 0 .. 15 {
+    for _ in 0..15 {
         drain_node = (drain_node + 1) % replicas;
         let drain_node = cluster.node(drain_node);
         let target_node = volume_1.spec.target.clone().unwrap().node;

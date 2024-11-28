@@ -91,7 +91,7 @@ impl FromStr for MessageId {
     fn from_str(source: &str) -> Result<Self, Self::Err> {
         match source.split('/').next() {
             Some(VERSION) => {
-                let id: MessageIdVs = source[VERSION.len() + 1 ..].parse()?;
+                let id: MessageIdVs = source[VERSION.len() + 1..].parse()?;
                 Ok(Self::v0(id))
             }
             _ => Err(strum::ParseError::VariantNotFound),

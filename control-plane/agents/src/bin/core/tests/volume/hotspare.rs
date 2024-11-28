@@ -340,7 +340,7 @@ async fn hotspare_replica_count_spread(cluster: &Cluster) {
         assert_eq!(volume.spec.num_replicas, replica_count as u8);
         assert_eq!(volume.state.replica_topology.len(), replica_count);
 
-        for node in 0 .. nodes.len() {
+        for node in 0..nodes.len() {
             let node = cluster.node(node as u32);
             let replicas = volume
                 .state

@@ -90,7 +90,7 @@ impl CoreClient {
                 .with_req_timeout(Duration::from_millis(250))
                 .with_max_retries(10),
         };
-        for attempt in 1 ..= timeout_opts.max_retries().unwrap_or_default() {
+        for attempt in 1..=timeout_opts.max_retries().unwrap_or_default() {
             match self
                 .volume
                 .probe(Some(Context::new(Some(timeout_opts.clone()))))

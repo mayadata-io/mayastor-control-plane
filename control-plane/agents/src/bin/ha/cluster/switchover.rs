@@ -508,7 +508,7 @@ impl SwitchOverEngine {
 
     /// Instantiates worker task to asynchronously process Switchover request.
     pub(crate) fn init_worker(&self, recv: Arc<Mutex<UnboundedReceiver<SwitchOverRequest>>>) {
-        for i in 0 .. WORKER_NUM {
+        for i in 0..WORKER_NUM {
             info!(worker = i, "Spawning Switchover Engine worker");
             let cloned_self = self.clone();
             let cloned_channel = recv.clone();

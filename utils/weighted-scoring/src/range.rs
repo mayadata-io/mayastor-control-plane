@@ -9,7 +9,7 @@ impl Ranged {
     /// Create a new ranged `Self` which is used to ensure that the inner `val` is within
     /// the range of 0 .. 100.
     pub fn new(value: u64) -> Result<Self, Error> {
-        if (0 .. 100).contains(&value) {
+        if (0..100).contains(&value) {
             Ok(Self(value))
         } else {
             Err(Error::Bounds {})

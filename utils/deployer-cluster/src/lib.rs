@@ -206,7 +206,7 @@ impl Cluster {
                 .with_req_timeout(Duration::from_millis(500))
                 .with_max_retries(20),
         };
-        for x in 1 .. timeout_opts.max_retries().unwrap_or_default() {
+        for x in 1..timeout_opts.max_retries().unwrap_or_default() {
             match client
                 .probe(Some(Context::new(Some(timeout_opts.clone()))))
                 .await
@@ -238,7 +238,7 @@ impl Cluster {
                 .with_timeout_backoff(Duration::from_millis(25))
                 .with_max_retries(100),
         };
-        for x in 1 .. timeout_opts.max_retries().unwrap_or_default() {
+        for x in 1..timeout_opts.max_retries().unwrap_or_default() {
             match client
                 .probe(Some(Context::new(Some(timeout_opts.clone()))))
                 .await
@@ -467,7 +467,7 @@ impl Cluster {
         let mut uuid = transport::ReplicaId::default().to_string();
         // we can't use a uuid with all zeroes, as spdk seems to ignore it and generate new one
         let replica = replica + 1;
-        let _ = uuid.drain(24 .. uuid.len());
+        let _ = uuid.drain(24..uuid.len());
         format!(
             "{}{:02x}{:02x}{:08x}",
             uuid, node as u8, pool as u8, replica
@@ -799,8 +799,8 @@ impl ClusterBuilder {
     /// Add `count` malloc pools (100MiB size) to each node.
     #[must_use]
     pub fn with_pools(mut self, count: u32) -> Self {
-        for _ in 0 .. count {
-            for node in 0 .. self.opts.io_engines {
+        for _ in 0..count {
+            for node in 0..self.opts.io_engines {
                 if let Some(pools) = self.pools.get_mut(&node) {
                     pools.push(PoolDisk::Malloc(100 * 1024 * 1024));
                 } else {
@@ -825,7 +825,7 @@ impl ClusterBuilder {
     /// Add a tmpfs img pool with `disk` to each io-engine node with the specified `size`.
     #[must_use]
     pub fn with_tmpfs_pool(mut self, size: u64) -> Self {
-        for node in 0 .. self.opts.io_engines {
+        for node in 0..self.opts.io_engines {
             self = self.with_tmpfs_pool_ix(node, size);
         }
         self
@@ -1134,7 +1134,7 @@ impl ClusterBuilder {
                     index: (pool_index + 1) as u32,
                     replicas: vec![],
                 };
-                for replica_index in 0 .. self.replicas.count {
+                for replica_index in 0..self.replicas.count {
                     let rep_id = Cluster::replica(*node, pool_index, replica_index);
                     pool.replicas.push(transport::CreateReplica {
                         node: pool.node.clone().into(),

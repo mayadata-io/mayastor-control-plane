@@ -196,7 +196,7 @@ async fn main() -> anyhow::Result<()> {
                 .long("retries")
                 .short('r')
                 .env("RETRIES")
-                .value_parser(clap::value_parser!(u32).range(1 ..))
+                .value_parser(clap::value_parser!(u32).range(1..))
                 .default_value("10")
                 .help("the number of retries before we set the resource into the error state"),
         )

@@ -236,7 +236,7 @@ async fn etcd_pagination() {
     let volume_prefix = key_prefix_obj(StorableObjectType::VolumeSpec, ApiVersion::V0);
 
     // Persist some nodes in etcd.
-    for i in 1 .. 11 {
+    for i in 1..11 {
         let key = format!("{}/node{}", node_prefix, i);
         let json_str = format!(
             r#"{{"id":"mayastor-node{}","endpoint":"136.144.51.107:10124","labels":{{}}}}"#,
@@ -247,7 +247,7 @@ async fn etcd_pagination() {
     }
 
     // Persist some volumes in new keyspace in etcd.
-    for _i in 1 .. 4 {
+    for _i in 1..4 {
         let uuid = Uuid::new_v4();
         let key = format!("{}/{}", volume_prefix, uuid);
         let json_str = r#"{"uuid":"456122b1-7e19-4148-a890-579ca785a119","size":2147483648,"labels":{"local":"true"},"num_replicas":3,"status":{"Created":"Online"},"target":{"node":"mayastor-node4","nexus":"d6ccbb97-d13e-4ffb-91a0-c7607bb01f8f","protocol":"nvmf"},"policy":{"self_heal":true},"topology":{"node":{"Explicit":{"allowed_nodes":["mayastor-node2","mayastor-master","mayastor-node3","mayastor-node1","mayastor-node4"],"preferred_nodes":["mayastor-node2","mayastor-node3","mayastor-node4","mayastor-master","mayastor-node1"]}},"pool":{"Labelled":{"exclusion":{},"inclusion":{"org.com/created-by":"msp-operator"}}}},"last_nexus_id":"d6ccbb97-d13e-4ffb-91a0-c7607bb01f8f","operation":null}"#;
@@ -256,7 +256,7 @@ async fn etcd_pagination() {
     }
 
     // Persist some volumes in old key space in etcd.
-    for _i in 1 .. 6 {
+    for _i in 1..6 {
         let uuid = Uuid::new_v4();
         let key = format!("{}/{}", OLD_VOLUME_PREFIX, uuid);
         let json_str = r#"{"uuid":"456122b1-7e19-4148-a890-579ca785a119","size":2147483648,"labels":{"local":"true"},"num_replicas":3,"status":{"Created":"Online"},"target":{"node":"mayastor-node4","nexus":"d6ccbb97-d13e-4ffb-91a0-c7607bb01f8f","protocol":"nvmf"},"policy":{"self_heal":true},"topology":{"node":{"Explicit":{"allowed_nodes":["mayastor-node2","mayastor-master","mayastor-node3","mayastor-node1","mayastor-node4"],"preferred_nodes":["mayastor-node2","mayastor-node3","mayastor-node4","mayastor-master","mayastor-node1"]}},"pool":{"Labelled":{"exclusion":{},"inclusion":{"org.com/created-by":"msp-operator"}}}},"last_nexus_id":"d6ccbb97-d13e-4ffb-91a0-c7607bb01f8f","operation":null}"#;
@@ -265,7 +265,7 @@ async fn etcd_pagination() {
     }
 
     // Persist some nexus info in old key space in etcd.
-    for _i in 1 .. 6 {
+    for _i in 1..6 {
         let uuid = Uuid::new_v4();
         let key = format!("{}", uuid);
         let json_str = r#"{"children":[{"healthy":true,"uuid":"82779efa-a0c7-4652-a37b-83eefd894714"},{"healthy":true,"uuid":"2d98fa96-ac12-40be-acdc-e3559c0b1530"},{"healthy":true,"uuid":"620ff519-419a-48d6-97a8-c1ba3260d87e"}],"clean_shutdown":false}"#;

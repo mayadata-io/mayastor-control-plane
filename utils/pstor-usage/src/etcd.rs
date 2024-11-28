@@ -78,7 +78,7 @@ impl Sampler for EtcdSampler {
 
         let base = self.etcd.db_size().await?;
         let mut acc = base;
-        for _ in 1 ..= self.steps {
+        for _ in 1..=self.steps {
             created.push(resource_mgr.create(client, count).await?);
             let usage = self.etcd.db_size().await? - acc;
 
