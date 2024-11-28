@@ -16,7 +16,7 @@ path = "./src/lib.rs"
 
 [dependencies]
 # Actix Server, telemetry
-rustls = { version = "0.23.16", default-features = false }
+rustls = { version = "0.23.19", default-features = false }
 rustls-pemfile = "2.2.0"
 actix-web = { version = "4.9.0", features = ["rustls-0_23"] }
 actix-service = "2.0.2"
