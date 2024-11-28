@@ -33,11 +33,11 @@ impl ComponentAction for CsiNode {
                 0
             };
 
-            for i in 0 .. local_nodes {
+            for i in 0..local_nodes {
                 cfg = CsiNode::with_local_node(i, options, cfg)?;
             }
 
-            for i in 0 .. options.app_nodes() {
+            for i in 0..options.app_nodes() {
                 cfg = CsiNode::with_app_node(
                     i,
                     cfg,
@@ -56,12 +56,12 @@ impl ComponentAction for CsiNode {
                 0
             };
 
-            for i in 0 .. local_nodes {
+            for i in 0..local_nodes {
                 let container_name = Self::local_container_name(&IoEngine::name(i, options));
                 cfg.start(&container_name).await?;
             }
 
-            for i in 0 .. options.app_nodes() {
+            for i in 0..options.app_nodes() {
                 cfg.start(&Self::container_name(i)).await?;
             }
         }
@@ -79,11 +79,11 @@ impl ComponentAction for CsiNode {
             0
         };
 
-        for i in 0 .. local_nodes {
+        for i in 0..local_nodes {
             CsiNode::wait_local_node(i, options).await?;
         }
 
-        for i in 0 .. options.app_nodes() {
+        for i in 0..options.app_nodes() {
             CsiNode::wait_app_node(i).await?;
         }
 

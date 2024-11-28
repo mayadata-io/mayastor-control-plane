@@ -93,7 +93,7 @@ async fn get_volumes_paginated() {
 
     // Create an additional 2 volumes. We do not need to create the first volume because this is
     // already created by the setup code.
-    for uuid in volume_uuids[1 ..= 2].iter() {
+    for uuid in volume_uuids[1..=2].iter() {
         cluster()
             .await
             .rest_v00()
@@ -178,7 +178,7 @@ async fn get_snapshots() {
         .expect("Volume not found");
 
     // Create four snapshots
-    for snapid in snap_uuids[0 ..= 3].iter() {
+    for snapid in snap_uuids[0..=3].iter() {
         // Create four snapshots.
         test_cluster
             .rest_v00()

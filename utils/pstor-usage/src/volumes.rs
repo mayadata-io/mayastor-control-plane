@@ -27,7 +27,7 @@ impl ResourceMgr for VolMgr {
     type Output = Vec<models::Volume>;
     async fn create(&self, client: &ApiClient, count: u32) -> anyhow::Result<Self::Output> {
         let mut created_volumes = Vec::with_capacity(count as usize);
-        for _ in 0 .. count {
+        for _ in 0..count {
             let volume = client
                 .volumes_api()
                 .put_volume(

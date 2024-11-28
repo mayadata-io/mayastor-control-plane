@@ -36,7 +36,7 @@ async fn concurrent_rebuilds() {
     let vol_cli = cli.volumes_api();
 
     let mut volumes = vec![];
-    for i in 0 .. nr_volumes {
+    for i in 0..nr_volumes {
         let i = i % io_engines;
         #[allow(clippy::identity_op)]
         let volume = vol_cli
@@ -69,7 +69,7 @@ async fn concurrent_rebuilds() {
         volumes.push(volume);
     }
 
-    for _ in 0 .. rebuild_loops {
+    for _ in 0..rebuild_loops {
         match replica_count {
             1 => {
                 for volume in &volumes {
@@ -929,7 +929,7 @@ async fn destroy_rebuilding_nexus() {
         .await
         .unwrap();
 
-    for _ in 0 .. 40 {
+    for _ in 0..40 {
         let replicas = volume_1
             .state
             .replica_topology

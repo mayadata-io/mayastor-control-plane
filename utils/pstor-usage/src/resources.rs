@@ -82,7 +82,7 @@ pub(crate) trait ResourceSample {
             }
         }
         if add.len() > self.points().len() {
-            let add = &add[self.points().len() .. add.len()];
+            let add = &add[self.points().len()..add.len()];
             self.points_mut().extend(add);
         }
     }

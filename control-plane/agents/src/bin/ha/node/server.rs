@@ -442,7 +442,7 @@ impl NodeAgentOperations for NodeAgentSvc {
             .nvme_path()
             .parse::<Uri>()
             .map_err(|_| SvcError::InvalidArguments {})?;
-        let nqn = uri.path()[1 ..].to_string();
+        let nqn = uri.path()[1..].to_string();
         match Subsystem::try_from_nqn(nqn.as_str()) {
             Ok(subsys_list) => {
                 let controller_list = subsys_list
@@ -504,7 +504,7 @@ impl ParsedUri {
             TrType::default()
         };
 
-        let nqn = uri.path()[1 ..].to_string();
+        let nqn = uri.path()[1..].to_string();
 
         Ok(Self {
             host,

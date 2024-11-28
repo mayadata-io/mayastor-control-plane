@@ -116,7 +116,7 @@ impl NvmeNqn {
         match self {
             NvmeNqn::Org { date, domain, .. } => Some(format!("nqn.{date}.{domain}")),
             NvmeNqn::Unique { .. } => {
-                Some(NVME_NQN_UUID_PRE[.. NVME_NQN_UUID_PRE.len()].to_string())
+                Some(NVME_NQN_UUID_PRE[..NVME_NQN_UUID_PRE.len()].to_string())
             }
             NvmeNqn::Invalid { .. } => None,
         }
@@ -202,7 +202,7 @@ impl TryFrom<Uri> for NvmeNqn {
     fn try_from(value: Uri) -> Result<Self, Self::Error> {
         let mut path = value.path();
         if path.starts_with('/') {
-            path = &path[1 ..];
+            path = &path[1..];
         }
         Self::try_from(path)
     }

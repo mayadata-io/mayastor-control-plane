@@ -1,4 +1,4 @@
-{ norust ? false, devrustup ? true, rust-profile ? "nightly", io-engine ? "" }:
+{ norust ? false, devrustup ? true, rust-profile ? "stable", io-engine ? "" }:
 let
   sources = import ./nix/sources.nix;
   pkgs = import sources.nixpkgs {

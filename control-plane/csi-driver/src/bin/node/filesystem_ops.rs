@@ -477,7 +477,7 @@ pub(crate) async fn run_fs_expand_command(cmd_and_args: Vec<&str>) -> Result<(),
     };
 
     let cmd = cmd_and_args[0];
-    let args = cmd_and_args[1 ..].to_vec();
+    let args = cmd_and_args[1..].to_vec();
 
     let out = Command::new(cmd)
         .args(args.as_slice())

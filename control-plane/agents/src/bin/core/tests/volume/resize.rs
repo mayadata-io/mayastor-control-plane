@@ -361,7 +361,7 @@ async fn resize_with_cluster_capacity_limit_concurrent() {
         });
     }
     // Collect results from the channel
-    for _ in 0 .. num_volumes {
+    for _ in 0..num_volumes {
         results.push(rx.recv().await.unwrap());
     }
 
@@ -447,7 +447,7 @@ async fn grpc_resize_volume_with_limit(
 // Creates count number of volumes, and return the uuid of volume to be resized.
 async fn create_volumes(volume_client: &dyn VolumeOperations, count: u64) -> Vec<Uuid> {
     let mut volumes = Vec::with_capacity(count as usize);
-    for _ in 0 .. count {
+    for _ in 0..count {
         let vol_uuid = Uuid::new_v4();
         let volume = volume_client
             .create(

@@ -12,7 +12,7 @@ impl ComponentAction for IoEngine {
     fn configure(&self, options: &StartOptions, cfg: Builder) -> Result<Builder, Error> {
         let mut cfg = cfg;
         let host_tmp = crate::host_tmp()?;
-        for i in 0 .. options.io_engines + options.idle_io_engines {
+        for i in 0..options.io_engines + options.idle_io_engines {
             let io_engine_socket =
                 format!("{}:10124", cfg.next_ip_for_name(&Self::name(i, options))?);
             let name = Self::name(i, options);
@@ -61,9 +61,9 @@ impl ComponentAction for IoEngine {
                 true => {
                     let cores = 1.max(options.io_engine_cores);
                     let initial = i * cores;
-                    initial .. initial + cores
+                    initial..initial + cores
                 }
-                false => 0 .. options.io_engine_cores,
+                false => 0..options.io_engine_cores,
             }
             .map(|c| c.to_string())
             .collect::<Vec<_>>()
@@ -104,13 +104,13 @@ impl ComponentAction for IoEngine {
         Ok(cfg)
     }
     async fn start(&self, options: &StartOptions, cfg: &ComposeTest) -> Result<(), Error> {
-        let io_engines = (0 .. options.io_engines)
+        let io_engines = (0..options.io_engines)
             .map(|i| async move { cfg.start(&Self::name(i, options)).await });
         futures::future::try_join_all(io_engines).await?;
         Ok(())
     }
     async fn wait_on(&self, options: &StartOptions, cfg: &ComposeTest) -> Result<(), Error> {
-        for i in 0 .. options.io_engines {
+        for i in 0..options.io_engines {
             let name = Self::name(i, options);
             let container_ip = cfg.container_ip_as_ref(&name);
             let socket = SocketAddr::new(IpAddr::from(*container_ip), 10124);
@@ -124,7 +124,7 @@ impl ComponentAction for IoEngine {
             .await?;
             hdl.ping().await.unwrap();
         }
-        for i in 0 .. options.io_engines {
+        for i in 0..options.io_engines {
             let name = Self::name(i, options);
             if i == 0 {
                 let rm = match options.io_engine_bin.is_some() {

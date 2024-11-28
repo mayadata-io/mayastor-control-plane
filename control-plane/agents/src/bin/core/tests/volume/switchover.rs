@@ -433,7 +433,7 @@ async fn volume_republish_nexus_recreation() {
 }
 
 async fn pool_recreated(cluster: &Cluster, max_tries: i32) -> bool {
-    for _ in 1 .. max_tries {
+    for _ in 1..max_tries {
         if let Ok(pools) = cluster.grpc_client().pool().get(Filter::None, None).await {
             if pools
                 .into_inner()

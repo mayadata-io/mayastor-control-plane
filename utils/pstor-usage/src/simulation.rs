@@ -330,7 +330,7 @@ impl TabledData for ResourceSamples {
 
         let mut rows = vec![];
         let mut acc_cache = vec![0; self.len()];
-        for row_index in 0 .. max_row {
+        for row_index in 0..max_row {
             let mut row = prettytable::Row::default();
             for (index, estimation) in self.inner().iter().enumerate() {
                 let acc = acc_cache.get_mut(index).expect("already validated");

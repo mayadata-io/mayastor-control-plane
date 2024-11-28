@@ -65,7 +65,7 @@ async fn events() {
             .await
             .unwrap();
 
-    for _ in 0 .. 3 {
+    for _ in 0..3 {
         pool_creation_event_test(&mut events_mbus_subscription).await;
     }
 

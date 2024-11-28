@@ -229,7 +229,7 @@ async fn wait_pool_state(
     present: bool,
     max_tries: i32,
 ) -> bool {
-    for _ in 1 .. max_tries {
+    for _ in 1..max_tries {
         let filter = Filter::Pool(pool.clone());
         if let Ok(pools) = cluster.grpc_client().pool().get(filter, None).await {
             if pools
