@@ -106,3 +106,16 @@ Feature: CSI node plugin
   Scenario: publishing a reader only block volume as rw
     Given a block volume staged as "MULTI_NODE_READER_ONLY"
     When publishing the block volume as "rw" should fail
+
+  Scenario: re-staging after controller loss timeout
+    Given a staged volume
+    When the kernel device is removed after a controller loss timeout
+    Then the volume should be unstageable
+    And the volume should be stageable again
+
+  Scenario: re-staging after controller loss timeout without unstaging
+    Given a staged volume
+    When the kernel device is removed after a controller loss timeout
+    Then the mounts become broken
+    But the volume should be stageable on a different path
+    And the nvme device should have a different controller and namespace

@@ -1,3 +1,7 @@
+import http
+import time
+from pathlib import Path
+
 import pytest
 from pytest_bdd import given, scenario, then, when, parsers
 
@@ -6,11 +10,13 @@ import subprocess
 
 import grpc
 import csi_pb2 as pb
+import openapi
 from common import disk_pool_label
 
 from common.apiclient import ApiClient
 from common.csi import CsiHandle
 from common.deployer import Deployer
+from common.docker import Docker
 from openapi.model.create_pool_body import CreatePoolBody
 from openapi.model.publish_volume_body import PublishVolumeBody
 from common.operations import Volume as VolumeOps
@@ -18,10 +24,18 @@ from common.operations import Pool as PoolOps
 from openapi.model.create_volume_body import CreateVolumeBody
 from openapi.model.volume_policy import VolumePolicy
 from openapi.model.volume_share_protocol import VolumeShareProtocol
+from common.nvme import (
+    nvme_find_device,
+    nvme_set_reconnect_delay,
+    nvme_set_ctrl_loss_tmo,
+    wait_nvme_gone_device,
+    nvme_find_controller,
+)
 
 POOL1_UUID = "ec176677-8202-4199-b461-2b68e53a055f"
 NODE1 = "io-engine-1"
 VOLUME_SIZE = 32 * 1024 * 1024
+FS_TYPE = "ext4"
 
 
 class Nexus:
@@ -274,12 +288,25 @@ def test_unstaging_a_single_writer_volume():
     """Unstaging a single writer volume."""
 
 
+@scenario("node.feature", "re-staging after controller loss timeout")
+def test_restaging_after_controller_loss_timeout():
+    """re-staging after controller loss timeout."""
+
+
+@scenario("node.feature", "re-staging after controller loss timeout without unstaging")
+def test_restaging_after_controller_loss_timeout_without_unstaging():
+    """re-staging after controller loss timeout without unstaging."""
+
+
 @pytest.fixture
 def published_nexuses(setup, volumes):
     published = {}
     yield published
     for uuid in published.keys():
-        ApiClient.volumes_api().del_volume_target(uuid)
+        try:
+            ApiClient.volumes_api().del_volume_target(uuid)
+        except openapi.ApiException as e:
+            assert e.status == http.HTTPStatus.PRECONDITION_FAILED
 
 
 @pytest.fixture
@@ -288,7 +315,10 @@ def publish_nexus(setup, volumes, published_nexuses):
         volume = ApiClient.volumes_api().put_volume_target(
             uuid,
             publish_volume_body=PublishVolumeBody(
-                {}, VolumeShareProtocol("nvmf"), node=NODE1, frontend_node=""
+                {},
+                VolumeShareProtocol("nvmf"),
+                node=NODE1,
+                frontend_node=Deployer.csi_node_name(0),
             ),
         )
         nexus = Nexus(uuid, protocol, volume.state["target"]["device_uri"])
@@ -427,7 +457,7 @@ def generic_staged_volume(get_published_nexus, stage_volume, staging_target_path
         nexus.uri,
         "MULTI_NODE_SINGLE_WRITER",
         staging_target_path,
-        "ext4",
+        FS_TYPE,
     )
     stage_volume(volume)
     return volume
@@ -467,7 +497,7 @@ def attempt_to_stage_volume_with_missing_staging_target_path(
                         mode=pb.VolumeCapability.AccessMode.Mode.MULTI_NODE_SINGLE_WRITER
                     ),
                     mount=pb.VolumeCapability.MountVolume(
-                        fs_type="ext4", mount_flags=[]
+                        fs_type=FS_TYPE, mount_flags=[]
                     ),
                 ),
                 secrets={},
@@ -510,7 +540,7 @@ def attempt_to_stage_volume_with_missing_volume_id(
                         mode=pb.VolumeCapability.AccessMode.Mode.MULTI_NODE_SINGLE_WRITER
                     ),
                     mount=pb.VolumeCapability.MountVolume(
-                        fs_type="ext4", mount_flags=[]
+                        fs_type=FS_TYPE, mount_flags=[]
                     ),
                 ),
                 secrets={},
@@ -533,7 +563,7 @@ def attempt_to_stage_volume_with_missing_access_mode(
                 staging_target_path=staging_target_path,
                 volume_capability=pb.VolumeCapability(
                     mount=pb.VolumeCapability.MountVolume(
-                        fs_type="ext4", mount_flags=[]
+                        fs_type=FS_TYPE, mount_flags=[]
                     )
                 ),
                 secrets={},
@@ -626,7 +656,7 @@ def attempt_to_stage_different_volume_with_same_staging_target_path(
                 nexus.uri,
                 volume.mode,
                 volume.staging_target_path,
-                "ext4",
+                FS_TYPE,
             )
         )
     assert error.value.code() == grpc.StatusCode.ALREADY_EXISTS
@@ -733,3 +763,76 @@ def publish_block_volume_as_read_or_write(
 @then(parsers.parse("the request should {disposition}"))
 def request_success_expected(disposition):
     return disposition == "succeed"
+
+
+@when("the kernel device is removed after a controller loss timeout")
+def _(generic_staged_volume):
+    """the kernel device is removed after a controller loss timeout."""
+    uri = generic_staged_volume.uri
+    nvme_set_reconnect_delay(uri, 1)
+    nvme_set_ctrl_loss_tmo(uri, 1)
+    ApiClient.volumes_api().del_volume_target(generic_staged_volume.uuid)
+    wait_nvme_gone_device(uri)
+
+
+@then("the volume should be stageable again")
+def _(publish_nexus, generic_staged_volume, stage_volume):
+    """the volume should be stageable again."""
+    publish_nexus(generic_staged_volume.uuid, generic_staged_volume.protocol)
+    stage_volume(generic_staged_volume)
+    uri = generic_staged_volume.uri
+    device = nvme_find_device(uri)
+    print(device)
+
+
+@then("the volume should be unstageable")
+def _(csi_instance, generic_staged_volume, staged_volumes):
+    """the volume should be unstageable."""
+    volume = generic_staged_volume
+    csi_instance.node.NodeUnstageVolume(
+        pb.NodeUnstageVolumeRequest(
+            volume_id=volume.uuid, staging_target_path=volume.staging_target_path
+        )
+    )
+    del staged_volumes[volume.uuid]
+
+
+@then("the mounts become broken", target_fixture="lost_device")
+def _(generic_staged_volume):
+    """the mounts become broken."""
+    result = Docker.execute(
+        Deployer.csi_node_name(0),
+        f"findmnt {generic_staged_volume.staging_target_path} -osource -rnf",
+    )
+    assert result.exit_code == 0, f"{result.output}"
+    device = str(result.output, "utf-8").removesuffix("\n")
+    # on older kernels, the controller is gone, but the device is still present (broken)
+    # assert not Path(device).exists(), "device must be gone"
+    wait_nvme_gone_device(generic_staged_volume.uri)
+    assert not Path(f"/sys/fs/{FS_TYPE}/{device}").exists(), "mount must be broken"
+    yield device
+    Docker.execute(
+        Deployer.csi_node_name(0),
+        f"umount --force {generic_staged_volume.staging_target_path}",
+    )
+
+
+@then("the volume should be stageable on a different path", target_fixture="new_device")
+def _(publish_nexus, generic_staged_volume, stage_volume):
+    """the volume should be stageable on a different path."""
+    volume = generic_staged_volume
+    volume.staging_target_path = f"{volume.staging_target_path}-2"
+    publish_nexus(volume.uuid, volume.protocol)
+    stage_volume(volume)
+    yield nvme_find_device(volume.uri)
+
+
+@then("the nvme device should have a different controller and namespace")
+def _(generic_staged_volume, lost_device, new_device):
+    """the nvme device should have a different controller and namespace."""
+    assert lost_device != new_device
+    print(f"{lost_device} => {new_device}")
+    ctrl = nvme_find_controller(generic_staged_volume.uri)
+    assert not new_device.startswith(ctrl.get("Controller")), "Different controller"
+    assert lost_device.split("n")[1] == new_device.split("n")[1], "Same subsystem"
+    assert lost_device.split("n")[2] != new_device.split("n")[2], "Different ns"

@@ -195,6 +195,11 @@ class Deployer(object):
         return f"io-engine-{id + 1}"
 
     @staticmethod
+    def csi_node_name(id: int):
+        assert id >= 0
+        return f"csi-node-{id + 1}"
+
+    @staticmethod
     def create_disks(len=1, size=100 * 1024 * 1024):
         host_tmp = workspace_tmp()
         disks = list(map(lambda x: f"disk_{x}.img", range(1, len + 1)))
