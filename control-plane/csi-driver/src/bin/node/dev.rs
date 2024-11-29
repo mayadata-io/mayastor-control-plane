@@ -108,7 +108,7 @@ impl Device {
                 continue;
             }
 
-            if let Some(devname) = match_dev::match_nvmf_device(&device, &nvmf_key) {
+            if let Some(devname) = match_dev::match_nvmf_device_valid(&device, &nvmf_key)? {
                 let nqn = if std::env::var("MOAC").is_ok() {
                     format!("{}:nexus-{uuid}", nvme_target_nqn_prefix())
                 } else {

@@ -88,7 +88,7 @@ mkShell {
     [ ! -z "${io-engine}" ] && cowsay "${io-engine-moth}"
     [ ! -z "${io-engine}" ] && export IO_ENGINE_BIN="${io-engine-moth}"
     export PATH="$PATH:$(pwd)/target/debug"
-    export SUDO=$(which sudo || echo /run/wrappers/bin/sudo)
+    export SUDO=$(which sudo 2>/dev/null || echo /run/wrappers/bin/sudo)
 
     DOCKER_CONFIG=~/.docker/config.json
     if [ -f "$DOCKER_CONFIG" ]; then
