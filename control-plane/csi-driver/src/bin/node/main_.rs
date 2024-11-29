@@ -10,10 +10,6 @@ use crate::{
     identity::Identity,
     k8s::patch_k8s_node,
     mount::probe_filesystems,
-    mount_utils::bin::{
-        flag::{parse_mount_flags, parse_unmount_flags},
-        mount_utils::{mount, unmount},
-    },
     node::{Node, RDMA_CONNECT_CHECK},
     nodeplugin_grpc::NodePluginGrpcServer,
     nodeplugin_nvme::NvmeOperationsSvc,
@@ -98,7 +94,7 @@ impl AsyncWrite for UnixStream {
 
 const GRPC_PORT: u16 = 50051;
 
-pub(super) async fn main() -> anyhow::Result<()> {
+pub(super) async unsafe fn main() -> anyhow::Result<()> {
     // Parse command line arguments.
     let matches = clap::Command::new(utils::package_description!())
         .about("k8s sidecar for IoEngine implementing CSI among others")
@@ -235,7 +231,7 @@ pub(super) async fn main() -> anyhow::Result<()> {
                 .help(
                     "Enable falling back to nvme connect over tcp if initiator node is not rdma capable, \n\
                     even though volume target is rdma capable."
-            )
+                )
         )
         .subcommand(
             clap::Command::new("fs-freeze")
@@ -257,61 +253,6 @@ pub(super) async fn main() -> anyhow::Result<()> {
                         .value_name("UUID")
                         .required(true)
                         .help("Uuid of the volume to unfreeze")
-                )
-        )
-        .subcommand(
-            clap::Command::new("mount")
-                .arg(
-                    Arg::new("source")
-                        .long("source")
-                        .value_name("PATH")
-                        .required(true)
-                        .help("Mount source path")
-                )
-                .arg(
-                    Arg::new("target")
-                        .long("target")
-                        .value_name("PATH")
-                        .required(true)
-                        .help("Mount target path")
-                )
-                .arg(
-                    Arg::new("fstype")
-                        .long("fstype")
-                        .value_name("STRING")
-                        .help("Filesystem type for filesystem volume")
-                )
-                .arg(
-                    Arg::new("data")
-                        .long("data")
-                        .value_name("STRING")
-                        .help("Options to apply for the file system on mount")
-                )
-                .arg(
-                    Arg::new("mount-flags")
-                        .long("mount-flags")
-                        .value_name("STRING")
-                        .value_parser(parse_mount_flags)
-                        .required(true)
-                        .help("Mount flags")
-                )
-        )
-        .subcommand(
-            clap::Command::new("unmount")
-                .arg(
-                    Arg::new("target")
-                        .long("target")
-                        .value_name("PATH")
-                        .required(true)
-                        .help("Unmount target path")
-                )
-                .arg(
-                    Arg::new("unmount-flags")
-                        .long("unmount-flags")
-                        .value_name("STRING")
-                        .value_parser(parse_unmount_flags)
-                        .required(true)
-                        .help("Unmount flags")
                 )
         )
         .get_matches();
@@ -340,33 +281,6 @@ pub(super) async fn main() -> anyhow::Result<()> {
                 fsfreeze(volume_id, FsFreezeOpt::Unfreeze)
                     .await
                     .map_err(|error| CsiDriverError::Fsfreeze { source: error })
-            }
-            ("mount", arg_matches) => {
-                let src_path = arg_matches.get_one::<String>("source").unwrap();
-                let dsc_path = arg_matches.get_one::<String>("target").unwrap();
-                let fstype = arg_matches.get_one::<String>("fstype");
-                let data = arg_matches.get_one::<String>("data");
-                let mnt_flags = arg_matches
-                    .get_one::<sys_mount::MountFlags>("mount-flags")
-                    .unwrap();
-                mount(
-                    src_path.to_string(),
-                    dsc_path.to_string(),
-                    data.cloned(),
-                    *mnt_flags,
-                    fstype.cloned(),
-                )
-                .await
-                .map_err(|error| CsiDriverError::Mount { source: error })
-            }
-            ("unmount", arg_matches) => {
-                let target_path = arg_matches.get_one::<String>("target").unwrap();
-                let flags = arg_matches
-                    .get_one::<sys_mount::UnmountFlags>("unmount-flags")
-                    .unwrap();
-                unmount(target_path.to_string(), *flags)
-                    .await
-                    .map_err(|error| CsiDriverError::Mount { source: error })
             }
             _ => Err(CsiDriverError::InvalidCsiDriverCommand),
         }?;

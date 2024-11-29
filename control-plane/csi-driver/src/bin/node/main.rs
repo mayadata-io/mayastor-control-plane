@@ -49,15 +49,17 @@ pub(crate) mod shutdown_event;
 #[tokio::main]
 #[cfg(target_os = "linux")]
 async fn main() -> anyhow::Result<ExitCode> {
-    match main_::main().await.map_err(|error| {
-        tracing::error!(%error, "Terminated with error");
-        error
-    }) {
-        Ok(_) => Ok(ExitCode::SUCCESS),
-        Err(error) => match error.downcast::<CsiDriverError>() {
-            Ok(error) => Ok(error.into()),
-            Err(error) => Err(error),
-        },
+    unsafe {
+        match main_::main().await.map_err(|error| {
+            tracing::error!(%error, "Terminated with error");
+            error
+        }) {
+            Ok(_) => Ok(ExitCode::SUCCESS),
+            Err(error) => match error.downcast::<CsiDriverError>() {
+                Ok(error) => Ok(error.into()),
+                Err(error) => Err(error),
+            },
+        }
     }
 }
 

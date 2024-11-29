@@ -1,12 +1,11 @@
 //! Utility functions for mounting and unmounting filesystems.
-use crate::{
-    filesystem_ops::FileSystem,
-    mount_utils::{bin::flag::MountFlag, MayastorMount},
-};
+use crate::filesystem_ops::FileSystem;
 use csi_driver::filesystem::FileSystem as Fs;
 use devinfo::mountinfo::{MountInfo, SafeMountIter};
 
+use crate::mount_utils::{mount, unmount};
 use std::{collections::HashSet, io::Error};
+use sys_mount::{FilesystemType, Mount, MountFlags, UnmountFlags};
 use tonic::Status;
 use tracing::{debug, info};
 use uuid::Uuid;
@@ -139,27 +138,25 @@ pub(crate) async fn filesystem_mount(
     target: &str,
     fstype: &FileSystem,
     options: &[String],
-) -> Result<MayastorMount, Status> {
-    let mut flags = Vec::new();
+) -> Result<(), Status> {
+    let mut flags = MountFlags::empty();
 
     let (readonly, value) = parse(options);
 
     if readonly {
-        flags.push(MountFlag::RDONLY.to_string());
+        flags.insert(MountFlags::RDONLY);
     }
 
     // I'm not certain if it's fine to pass "" so keep existing behaviour
-    let mount = if value.is_empty() {
-        MayastorMount::builder()
+    let mount_builder = if value.is_empty() {
+        Mount::builder()
     } else {
-        MayastorMount::builder().data(&value)
+        Mount::builder().data(&value)
     }
-    .fstype(fstype.as_ref())
-    .flags(flags.join(",").as_str())
-    .source(device)
-    .target(target)
-    .mount()
-    .await?;
+    .fstype(FilesystemType::Manual(fstype.as_ref()))
+    .flags(flags);
+
+    mount(mount_builder, device, target).await?;
 
     debug!(
         "Filesystem ({}) on device {} mounted onto target {} (options: {})",
@@ -169,19 +166,15 @@ pub(crate) async fn filesystem_mount(
         show(options)
     );
 
-    Ok(mount)
+    Ok(())
 }
 
 /// Unmount a device from a directory (mountpoint)
 /// Should not be used for removing bind mounts.
 pub(crate) async fn filesystem_unmount(target: &str) -> Result<(), Status> {
-    let flags: Vec<String> = Vec::new();
+    let flags = UnmountFlags::empty();
 
-    MayastorMount::builder()
-        .flags(flags.join(",").as_str())
-        .target(target)
-        .unmount()
-        .await?;
+    unmount(target, flags).await?;
 
     debug!("Target {} unmounted", target);
 
@@ -190,61 +183,50 @@ pub(crate) async fn filesystem_unmount(target: &str) -> Result<(), Status> {
 
 /// Bind mount a source path to a target path.
 /// Supports both directories and files.
-pub(crate) async fn bind_mount(
-    source: &str,
-    target: &str,
-    file: bool,
-) -> Result<MayastorMount, Status> {
-    let mut flags: Vec<String> = Vec::new();
+pub(crate) async fn bind_mount(source: &str, target: &str, file: bool) -> Result<(), Status> {
+    let mut flags = MountFlags::empty();
 
-    flags.push(MountFlag::BIND.to_string());
+    flags.insert(MountFlags::BIND);
 
     if file {
-        flags.push(MountFlag::RDONLY.to_string());
+        flags.insert(MountFlags::RDONLY);
     }
 
-    let mount = MayastorMount::builder()
-        .fstype("none")
-        .flags(flags.join(",").as_str())
-        .source(source)
-        .target(target)
-        .mount()
-        .await?;
+    let mount_builder = Mount::builder()
+        .fstype(FilesystemType::Manual("none"))
+        .flags(flags);
+
+    mount(mount_builder, source, target).await?;
 
     debug!("Source {} bind mounted onto target {}", source, target);
 
-    Ok(mount)
+    Ok(())
 }
 
 /// Bind remount a path to modify mount options.
 /// Assumes that target has already been bind mounted.
-pub(crate) async fn bind_remount(
-    target: &str,
-    options: &[String],
-) -> Result<MayastorMount, Status> {
-    let mut flags: Vec<String> = Vec::new();
+pub(crate) async fn bind_remount(target: &str, options: &[String]) -> Result<(), Status> {
+    let mut flags = MountFlags::empty();
 
     let (readonly, value) = parse(options);
 
-    flags.push(MountFlag::BIND.to_string());
+    flags.insert(MountFlags::BIND);
 
     if readonly {
-        flags.push(MountFlag::RDONLY.to_string());
+        flags.insert(MountFlags::RDONLY);
     }
 
-    flags.push(MountFlag::REMOUNT.to_string());
+    flags.insert(MountFlags::REMOUNT);
 
-    let mount = if value.is_empty() {
-        MayastorMount::builder()
+    let mount_builder = if value.is_empty() {
+        Mount::builder()
     } else {
-        MayastorMount::builder().data(&value)
+        Mount::builder().data(&value)
     }
-    .fstype("none")
-    .flags(flags.join(",").as_str())
-    .source("none")
-    .target(target)
-    .mount()
-    .await?;
+    .fstype(FilesystemType::Manual("none"))
+    .flags(flags);
+
+    mount(mount_builder, "none", target).await?;
 
     debug!(
         "Target {} bind remounted (options: {})",
@@ -252,19 +234,15 @@ pub(crate) async fn bind_remount(
         show(options)
     );
 
-    Ok(mount)
+    Ok(())
 }
 
 /// Unmounts a path that has previously been bind mounted.
 /// Should not be used for unmounting devices.
-pub(crate) async fn bind_unmount(target: &str) -> Result<(), Status> {
-    let flags: Vec<String> = Vec::new();
+pub(crate) async unsafe fn bind_unmount(target: &str) -> Result<(), Status> {
+    let flags = UnmountFlags::empty();
 
-    MayastorMount::builder()
-        .flags(flags.join(",").as_str())
-        .target(target)
-        .unmount()
-        .await?;
+    unmount(target, flags).await?;
 
     debug!("Target {} bind unmounted", target);
 
@@ -272,25 +250,23 @@ pub(crate) async fn bind_unmount(target: &str) -> Result<(), Status> {
 }
 
 /// Remount existing mount as read only or read write.
-pub(crate) async fn remount(target: &str, ro: bool) -> Result<MayastorMount, Status> {
-    let mut flags: Vec<String> = Vec::new();
-    flags.push(MountFlag::REMOUNT.to_string());
+pub(crate) async fn remount(target: &str, ro: bool) -> Result<(), Status> {
+    let mut flags = MountFlags::empty();
+    flags.insert(MountFlags::REMOUNT);
 
     if ro {
-        flags.push(MountFlag::RDONLY.to_string());
+        flags.insert(MountFlags::RDONLY);
     }
 
-    let mount = MayastorMount::builder()
-        .fstype("none")
-        .flags(flags.join(",").as_str())
-        .source("")
-        .target(target)
-        .mount()
-        .await?;
+    let mount_builder = Mount::builder()
+        .fstype(FilesystemType::Manual("none"))
+        .flags(flags);
 
-    debug!("Target {} remounted with {}", target, flags.join(","));
+    mount(mount_builder, "", target).await?;
 
-    Ok(mount)
+    debug!("Target {} remounted with {}", target, flags.bits());
+
+    Ok(())
 }
 
 /// Mount a block device
@@ -298,56 +274,50 @@ pub(crate) async fn blockdevice_mount(
     source: &str,
     target: &str,
     readonly: bool,
-) -> Result<MayastorMount, Status> {
+) -> Result<(), Status> {
     debug!("Mounting {} ...", source);
 
-    let mut flags: Vec<String> = Vec::new();
-    flags.push(MountFlag::BIND.to_string());
+    let mut flags = MountFlags::empty();
+    flags.insert(MountFlags::BIND);
 
-    let mount = MayastorMount::builder()
-        .fstype("none")
-        .flags(flags.join(",").as_str())
-        .source(source)
-        .target(target)
-        .mount()
-        .await?;
+    let mount_builder = Mount::builder()
+        .fstype(FilesystemType::Manual("none"))
+        .flags(flags);
+
+    mount(mount_builder, source, target).await?;
 
     info!("Block device {} mounted to {}", source, target);
 
     if readonly {
-        flags.push(MountFlag::REMOUNT.to_string());
-        flags.push(MountFlag::RDONLY.to_string());
+        flags.insert(MountFlags::REMOUNT);
+        flags.insert(MountFlags::RDONLY);
 
-        let mount = MayastorMount::builder()
-            .fstype("")
-            .flags(flags.join(",").as_str())
-            .source("")
-            .target(target)
-            .mount()
-            .await?;
+        let mount_builder = Mount::builder()
+            .fstype(FilesystemType::Manual(""))
+            .flags(flags);
+        mount(mount_builder, "", target).await?;
 
         info!("Remounted block device {} (readonly) to {}", source, target);
-        return Ok(mount);
+        return Ok(());
     }
 
-    Ok(mount)
+    Ok(())
 }
 
 /// Unmount a block device.
 pub(crate) async fn blockdevice_unmount(target: &str) -> Result<(), Status> {
-    let flags: Vec<String> = Vec::new();
+    let flags = UnmountFlags::empty();
 
     debug!(
         "Unmounting block device {} (flags={}) ...",
         target,
-        flags.join(",")
+        flags.bits()
     );
 
-    MayastorMount::builder()
-        .flags(flags.join(",").as_str())
-        .target(target)
-        .unmount()
-        .await?;
+    let flags = UnmountFlags::empty();
+
+    unmount(target, flags).await?;
+
     info!("block device at {} has been unmounted", target);
     Ok(())
 }

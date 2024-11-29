@@ -3,7 +3,6 @@ use nix::errno::Errno;
 use nvmeadm::{error::NvmeError, nvmf_discovery};
 use snafu::Snafu;
 use std::{process::ExitCode, string::FromUtf8Error};
-use tokio::task::JoinError;
 
 /// A Device Attach/Detach error.
 /// todo: should this be an enum?
@@ -187,36 +186,14 @@ impl From<FsfreezeError> for ExitCode {
     }
 }
 
-/// Error for the mount operations.
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub(crate)), context(suffix(false)))]
-pub(crate) enum MountError {
-    #[snafu(display("Failed mount, error: {error}"))]
-    MountFailed { error: std::io::Error },
-    #[snafu(display("Failed unmount, error: {error}"))]
-    UnmountFailed { error: std::io::Error },
-    #[snafu(display("Failed to wait for thread termination, error: {join_error}"))]
-    FailedWaitForThread { join_error: JoinError },
-}
-
-impl From<MountError> for ExitCode {
-    fn from(value: MountError) -> Self {
-        match value {
-            MountError::MountFailed { .. } => ExitCode::from(Errno::ELIBACC as u8),
-            MountError::UnmountFailed { .. } => ExitCode::from(Errno::ELIBACC as u8),
-            MountError::FailedWaitForThread { .. } => ExitCode::from(Errno::ESRCH as u8),
-        }
-    }
-}
-
 /// Error for the csi driver operations.
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)), context(suffix(false)))]
 pub(crate) enum CsiDriverError {
     #[snafu(display("{source}"))]
     Fsfreeze { source: FsfreezeError },
-    #[snafu(display("{source}"))]
-    Mount { source: MountError },
+    // #[snafu(display("{source}"))]
+    // Mount { source: MountError },
     #[snafu(display("Not a valid mayastor csi driver command"))]
     InvalidCsiDriverCommand,
 }
@@ -227,17 +204,10 @@ impl From<FsfreezeError> for CsiDriverError {
     }
 }
 
-impl From<MountError> for CsiDriverError {
-    fn from(value: MountError) -> Self {
-        Self::Mount { source: value }
-    }
-}
-
 impl From<CsiDriverError> for ExitCode {
     fn from(value: CsiDriverError) -> Self {
         match value {
             CsiDriverError::Fsfreeze { source } => source.into(),
-            CsiDriverError::Mount { source } => source.into(),
             CsiDriverError::InvalidCsiDriverCommand => ExitCode::from(Errno::EINVAL as u8),
         }
     }

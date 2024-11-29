@@ -355,8 +355,10 @@ pub(crate) async fn publish_fs_volume(
 
             debug!("Unmounting {}", target_path);
 
-            if let Err(error) = mount::bind_unmount(target_path).await {
-                error!("Failed to unmount {}: {}", target_path, error);
+            unsafe {
+                if let Err(error) = mount::bind_unmount(target_path).await {
+                    error!("Failed to unmount {}: {}", target_path, error);
+                }
             }
 
             return Err(Status::new(Code::Internal, message));
@@ -399,14 +401,16 @@ pub(crate) async fn unpublish_fs_volume(msg: &NodeUnpublishVolumeRequest) -> Res
 
     debug!("Unmounting {}", target_path);
 
-    if let Err(error) = mount::bind_unmount(target_path).await {
-        return Err(failure!(
-            Code::Internal,
-            "Failed to unpublish volume {}: failed to unmount {}: {}",
-            volume_id,
-            target_path,
-            error
-        ));
+    unsafe {
+        if let Err(error) = mount::bind_unmount(target_path).await {
+            return Err(failure!(
+                Code::Internal,
+                "Failed to unpublish volume {}: failed to unmount {}: {}",
+                volume_id,
+                target_path,
+                error
+            ));
+        }
     }
 
     debug!("Removing directory {}", target_path);

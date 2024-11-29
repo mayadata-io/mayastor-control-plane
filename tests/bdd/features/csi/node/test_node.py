@@ -18,6 +18,7 @@ from common.operations import Pool as PoolOps
 from openapi.model.create_volume_body import CreateVolumeBody
 from openapi.model.volume_policy import VolumePolicy
 from openapi.model.volume_share_protocol import VolumeShareProtocol
+from common.docker import Docker
 
 POOL1_UUID = "ec176677-8202-4199-b461-2b68e53a055f"
 NODE1 = "io-engine-1"
@@ -654,6 +655,7 @@ def attempt_to_stage_same_volume_with_different_staging_target_path(
 @when("unstaging the volume")
 def unstaging_the_volume(csi_instance, get_staged_volume, staged_volumes):
     volume = get_staged_volume
+    Docker.stop_container("io-engine-1")
     csi_instance.node.NodeUnstageVolume(
         pb.NodeUnstageVolumeRequest(
             volume_id=volume.uuid, staging_target_path=volume.staging_target_path
