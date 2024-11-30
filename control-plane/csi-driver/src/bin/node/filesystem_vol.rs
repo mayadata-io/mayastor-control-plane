@@ -91,7 +91,7 @@ pub(crate) async fn stage_fs_volume(
         // If clone's fs id change was requested and we were not able to change it in first attempt
         // unmount and continue the stage again.
         let continue_stage = if fs_id.is_some() {
-            continue_after_unmount_on_fs_id_diff(fstype ,device_path, fs_staging_path, &volume_uuid)
+            continue_after_unmount_on_fs_id_diff(fstype ,device_path, fs_staging_path, &volume_uuid).await
                 .map_err(|error| {
                     failure!(
                     Code::FailedPrecondition,
@@ -107,7 +107,7 @@ pub(crate) async fn stage_fs_volume(
         if !continue_stage {
             // todo: validate other flags?
             if mnt.mount_flags.readonly() != existing.options.readonly() {
-                mount::remount(fs_staging_path, mnt.mount_flags.readonly())?;
+                mount::remount(fs_staging_path, mnt.mount_flags.readonly()).await?;
             }
 
             return Ok(());
@@ -161,7 +161,8 @@ pub(crate) async fn stage_fs_volume(
 
     debug!("Mounting device {} onto {}", device_path, fs_staging_path);
 
-    if let Err(error) = mount::filesystem_mount(device_path, fs_staging_path, fstype, &mount_flags)
+    if let Err(error) =
+        mount::filesystem_mount(device_path, fs_staging_path, fstype, &mount_flags).await
     {
         return Err(failure!(
             Code::Internal,
@@ -209,7 +210,7 @@ pub(crate) async fn unstage_fs_volume(msg: &NodeUnstageVolumeRequest) -> Result<
             ));
         }
 
-        if let Err(error) = mount::filesystem_unmount(fs_staging_path) {
+        if let Err(error) = mount::filesystem_unmount(fs_staging_path).await {
             return Err(failure!(
                 Code::Internal,
                 "Failed to unstage volume {}: failed to unmount device {:?} from {}: {}",
@@ -227,7 +228,7 @@ pub(crate) async fn unstage_fs_volume(msg: &NodeUnstageVolumeRequest) -> Result<
 }
 
 /// Publish a filesystem volume
-pub(crate) fn publish_fs_volume(
+pub(crate) async fn publish_fs_volume(
     msg: &NodePublishVolumeRequest,
     mnt: &MountVolume,
     filesystems: &[FileSystem],
@@ -328,7 +329,7 @@ pub(crate) fn publish_fs_volume(
 
     debug!("Mounting {} to {}", fs_staging_path, target_path);
 
-    if let Err(error) = mount::bind_mount(fs_staging_path, target_path, false) {
+    if let Err(error) = mount::bind_mount(fs_staging_path, target_path, false).await {
         return Err(failure!(
             Code::Internal,
             "Failed to publish volume {}: failed to mount {} to {}: {}",
@@ -345,7 +346,7 @@ pub(crate) fn publish_fs_volume(
 
         debug!("Remounting {} as readonly", target_path);
 
-        if let Err(error) = mount::bind_remount(target_path, &options) {
+        if let Err(error) = mount::bind_remount(target_path, &options).await {
             let message = format!(
                 "Failed to publish volume {volume_id}: failed to mount {fs_staging_path} to {target_path} as readonly: {error}"
             );
@@ -354,7 +355,7 @@ pub(crate) fn publish_fs_volume(
 
             debug!("Unmounting {}", target_path);
 
-            if let Err(error) = mount::bind_unmount(target_path) {
+            if let Err(error) = mount::bind_unmount(target_path).await {
                 error!("Failed to unmount {}: {}", target_path, error);
             }
 
@@ -367,7 +368,7 @@ pub(crate) fn publish_fs_volume(
     Ok(())
 }
 
-pub(crate) fn unpublish_fs_volume(msg: &NodeUnpublishVolumeRequest) -> Result<(), Status> {
+pub(crate) async fn unpublish_fs_volume(msg: &NodeUnpublishVolumeRequest) -> Result<(), Status> {
     // filesystem mount
     let target_path = &msg.target_path;
     let volume_id = &msg.volume_id;
@@ -398,7 +399,7 @@ pub(crate) fn unpublish_fs_volume(msg: &NodeUnpublishVolumeRequest) -> Result<()
 
     debug!("Unmounting {}", target_path);
 
-    if let Err(error) = mount::bind_unmount(target_path) {
+    if let Err(error) = mount::bind_unmount(target_path).await {
         return Err(failure!(
             Code::Internal,
             "Failed to unpublish volume {}: failed to unmount {}: {}",
@@ -427,7 +428,7 @@ pub(crate) fn unpublish_fs_volume(msg: &NodeUnpublishVolumeRequest) -> Result<()
 
 /// Check if we can continue the staging incase the change fs id failed mid way and we want to retry
 /// the flow.
-fn continue_after_unmount_on_fs_id_diff(
+async fn continue_after_unmount_on_fs_id_diff(
     fstype: &FileSystem,
     device_path: &str,
     fs_staging_path: &str,
@@ -435,6 +436,7 @@ fn continue_after_unmount_on_fs_id_diff(
 ) -> Result<bool, String> {
     fstype
         .fs_ops()?
-        .unmount_on_fs_id_diff(device_path, fs_staging_path, volume_uuid)?;
+        .unmount_on_fs_id_diff(device_path, fs_staging_path, volume_uuid)
+        .await?;
     Ok(fstype == &Fs::Xfs.into())
 }

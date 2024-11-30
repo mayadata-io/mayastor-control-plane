@@ -22,73 +22,13 @@ use utils::tracing_telemetry::{FmtLayer, FmtStyle};
 
 use crate::client::AppNodesClientWrapper;
 use clap::Arg;
-use futures::TryFutureExt;
 use serde_json::json;
 use std::{
-    collections::HashMap,
-    env, fs,
-    future::Future,
-    io::ErrorKind,
-    net::SocketAddr,
-    pin::Pin,
-    str::FromStr,
-    sync::Arc,
-    task::{Context, Poll},
+    collections::HashMap, env, fs, future::Future, io::ErrorKind, net::SocketAddr, str::FromStr,
 };
-use tokio::{
-    io::{AsyncRead, AsyncWrite, ReadBuf},
-    net::UnixListener,
-};
-use tonic::transport::{server::Connected, Server};
+use tokio::net::UnixListener;
+use tonic::{codegen::tokio_stream::wrappers::UnixListenerStream, transport::Server};
 use tracing::{debug, error, info};
-
-#[derive(Clone, Debug)]
-pub struct UdsConnectInfo {
-    pub peer_addr: Option<Arc<tokio::net::unix::SocketAddr>>,
-    pub peer_cred: Option<tokio::net::unix::UCred>,
-}
-
-#[derive(Debug)]
-struct UnixStream(tokio::net::UnixStream);
-
-impl Connected for UnixStream {
-    type ConnectInfo = UdsConnectInfo;
-
-    fn connect_info(&self) -> Self::ConnectInfo {
-        UdsConnectInfo {
-            peer_addr: self.0.peer_addr().ok().map(Arc::new),
-            peer_cred: self.0.peer_cred().ok(),
-        }
-    }
-}
-
-impl AsyncRead for UnixStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.0).poll_read(cx, buf)
-    }
-}
-
-impl AsyncWrite for UnixStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        Pin::new(&mut self.0).poll_write(cx, buf)
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.0).poll_flush(cx)
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.0).poll_shutdown(cx)
-    }
-}
 
 const GRPC_PORT: u16 = 50051;
 
@@ -380,13 +320,7 @@ impl CsiServer {
             } else {
                 debug!("Successfully changed file permissions for CSI socket");
             }
-
-            async_stream::stream! {
-                loop {
-                    let item = uds.accept().map_ok(|(st, _)| UnixStream(st)).await;
-                    yield item;
-                }
-            }
+            UnixListenerStream::new(uds)
         };
 
         let node = Node::new(node_name.into(), node_selector, probe_filesystems());
