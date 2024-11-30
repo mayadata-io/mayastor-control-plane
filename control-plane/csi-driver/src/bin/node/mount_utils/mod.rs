@@ -5,6 +5,7 @@ use nix::{
 use sys_mount::{MountBuilder, UnmountFlags};
 use tokio::task::spawn_blocking;
 use tonic::Status;
+use tracing::info;
 
 /// Mounts a filesystem/block at `source` to a `target` path in the system.
 pub(crate) async fn mount<'a>(
@@ -16,12 +17,14 @@ pub(crate) async fn mount<'a>(
         match fork() {
             Ok(ForkResult::Parent { child }) => {
                 spawn_blocking(move || {
+                    info!("Starting to wait on child");
                     let wait_status = waitpid(child, None).map_err(|errno| {
                         Status::aborted(format!(
                             "Failed to wait for mount child process, errno : {}",
                             errno
                         ))
                     })?;
+                    info!("Finished waiting for child {:?}", wait_status);
                     match wait_status {
                         nix::sys::wait::WaitStatus::Exited(_, 0) => Ok(()),
                         _ => Err(Status::aborted("The mount process exited non-gracefully")),
@@ -38,17 +41,18 @@ pub(crate) async fn mount<'a>(
             }
             Ok(ForkResult::Child) => {
                 if let Err(errno) = setsid() {
-                    return Err(Status::aborted(format!(
-                        "Failed to detach mount child process, errno : {}",
-                        errno
-                    )));
+                    std::process::exit(errno as i32);
                 }
 
-                mount_builder.mount(device, target).map_err(|error| {
-                    Status::aborted(format!("Failed to execute mount command, {}", error))
-                })?;
+                if let Err(error) = mount_builder.mount(device, target) {
+                    if let Some(errno) = error.raw_os_error() {
+                        std::process::exit(errno);
+                    } else {
+                        std::process::exit(1);
+                    }
+                }
 
-                Ok(())
+                std::process::exit(0);
             }
             Err(error) => Err(Status::aborted(format!(
                 "Failed to create mount child process, errno :{}",
@@ -89,16 +93,18 @@ pub(crate) async fn unmount(target: &str, flags: UnmountFlags) -> Result<(), Sta
             }
             Ok(ForkResult::Child) => {
                 if let Err(errno) = setsid() {
-                    return Err(Status::aborted(format!(
-                        "Failed to detach the unmount child process, errno : {}",
-                        errno
-                    )));
+                    std::process::exit(errno as i32);
                 }
 
-                sys_mount::unmount(target, flags)
-                    .map_err(|error| Status::aborted(format!("Failed to unmount: {}", error)))?;
+                if let Err(error) = sys_mount::unmount(target, flags) {
+                    if let Some(errno) = error.raw_os_error() {
+                        std::process::exit(errno);
+                    } else {
+                        std::process::exit(1);
+                    }
+                }
 
-                Ok(())
+                std::process::exit(0);
             }
             Err(errno) => Err(Status::aborted(format!(
                 "Failed to create the unmount child process, errno : {}",

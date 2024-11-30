@@ -104,8 +104,8 @@ def setup():
         CreatePoolBody(["malloc:///disk?size_mb=200"], labels=pool_labels),
     )
     yield
-    PoolOps.delete_all()
-    Deployer.stop()
+    # PoolOps.delete_all()
+    # Deployer.stop()
 
 
 @pytest.fixture(scope="module")
@@ -655,7 +655,7 @@ def attempt_to_stage_same_volume_with_different_staging_target_path(
 @when("unstaging the volume")
 def unstaging_the_volume(csi_instance, get_staged_volume, staged_volumes):
     volume = get_staged_volume
-    Docker.stop_container("io-engine-1")
+    # Docker.stop_container("io-engine-1")
     csi_instance.node.NodeUnstageVolume(
         pb.NodeUnstageVolumeRequest(
             volume_id=volume.uuid, staging_target_path=volume.staging_target_path
