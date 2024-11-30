@@ -1,71 +1,11 @@
 use crate::{controller::CsiControllerSvc, identity::CsiIdentitySvc};
 use rpc::csi::{controller_server::ControllerServer, identity_server::IdentityServer};
 
-use futures::TryFutureExt;
-use std::{
-    fs,
-    io::ErrorKind,
-    ops::Add,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-};
-use tokio::{
-    io::{AsyncRead, AsyncWrite, ReadBuf},
-    net::UnixListener,
-};
-use tonic::transport::{server::Connected, Server};
+use std::{fs, io::ErrorKind, ops::Add};
+use tokio::net::UnixListener;
+use tonic::codegen::tokio_stream::wrappers::UnixListenerStream;
+use tonic::transport::Server;
 use tracing::{debug, error, info};
-
-#[derive(Debug)]
-struct UnixStream(tokio::net::UnixStream);
-
-impl Connected for UnixStream {
-    type ConnectInfo = UdsConnectInfo;
-
-    fn connect_info(&self) -> Self::ConnectInfo {
-        UdsConnectInfo {
-            peer_addr: self.0.peer_addr().ok().map(Arc::new),
-            peer_cred: self.0.peer_cred().ok(),
-        }
-    }
-}
-
-// Not sure why we need the inner fields, probably worth checking if we can remove them.
-#[derive(Clone, Debug)]
-#[allow(unused)]
-struct UdsConnectInfo {
-    peer_addr: Option<Arc<tokio::net::unix::SocketAddr>>,
-    peer_cred: Option<tokio::net::unix::UCred>,
-}
-
-impl AsyncRead for UnixStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.0).poll_read(cx, buf)
-    }
-}
-
-impl AsyncWrite for UnixStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        Pin::new(&mut self.0).poll_write(cx, buf)
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.0).poll_flush(cx)
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.0).poll_shutdown(cx)
-    }
-}
 
 pub(super) struct CsiServer {}
 impl CsiServer {
@@ -87,10 +27,10 @@ impl CsiServer {
             }
         }
 
-        debug!("CSI RPC server is listening on {}", csi_socket);
-
         let incoming = {
             let uds = UnixListener::bind(csi_socket)?;
+
+            info!("CSI RPC server is listening on {csi_socket}");
 
             // Change permissions on CSI socket to allow non-privileged clients to access it
             // to simplify testing.
@@ -103,12 +43,7 @@ impl CsiServer {
                 debug!("Successfully changed file permissions for CSI socket");
             }
 
-            async_stream::stream! {
-                loop {
-                    let item = uds.accept().map_ok(|(st, _)| UnixStream(st)).await;
-                    yield item;
-                }
-            }
+            UnixListenerStream::new(uds)
         };
 
         let cfg = crate::CsiControllerConfig::get_config();
