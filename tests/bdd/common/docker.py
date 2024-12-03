@@ -67,6 +67,12 @@ class Docker(object):
         container = docker_client.containers.get(name)
         container.unpause()
 
+    @staticmethod
+    def execute(name, commands):
+        docker_client = docker.from_env()
+        container = docker_client.containers.get(name)
+        return container.exec_run(commands)
+
     # Restart a container with the given name.
     def restart_container(name):
         docker_client = docker.from_env()

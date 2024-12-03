@@ -1,13 +1,12 @@
+use nvmeadm::{
+    error::NvmeError,
+    nvmf_discovery::{disconnect, ConnectArgsBuilder, TrType},
+};
 use std::{
     collections::HashMap,
     convert::{From, TryFrom},
     path::Path,
     str::FromStr,
-};
-
-use nvmeadm::{
-    error::NvmeError,
-    nvmf_discovery::{disconnect, ConnectArgsBuilder, TrType},
 };
 
 use csi_driver::PublishParams;
@@ -29,7 +28,7 @@ use crate::{
 use super::{Attach, Detach, DeviceError, DeviceName};
 
 lazy_static::lazy_static! {
-    static ref DEVICE_REGEX: Regex = Regex::new(r"nvme(\d{1,3})n1").unwrap();
+    static ref DEVICE_REGEX: Regex = Regex::new(r"nvme(\d{1,5})n(\d{1,5})").unwrap();
 }
 
 pub(super) struct NvmfAttach {
@@ -43,6 +42,7 @@ pub(super) struct NvmfAttach {
     ctrl_loss_tmo: Option<u32>,
     keep_alive_tmo: Option<u32>,
     hostnqn: Option<String>,
+    warn_bad: std::sync::atomic::AtomicBool,
 }
 
 impl NvmfAttach {
@@ -70,6 +70,7 @@ impl NvmfAttach {
             ctrl_loss_tmo,
             keep_alive_tmo,
             hostnqn,
+            warn_bad: std::sync::atomic::AtomicBool::new(true),
         }
     }
 
@@ -80,13 +81,20 @@ impl NvmfAttach {
         enumerator.match_subsystem("block")?;
         enumerator.match_property("DEVTYPE", "disk")?;
 
+        let mut first_error = Ok(None);
         for device in enumerator.scan_devices()? {
-            if match_nvmf_device(&device, &key).is_some() {
-                return Ok(Some(device));
+            match match_device(&device, &key, &self.warn_bad) {
+                Ok(name) if name.is_some() => {
+                    return Ok(Some(device));
+                }
+                Err(error) if first_error.is_ok() => {
+                    first_error = Err(error);
+                }
+                _ => {}
             }
         }
 
-        Ok(None)
+        first_error
     }
 }
 
@@ -153,6 +161,12 @@ impl Attach for NvmfAttach {
         if let Some(keep_alive_tmo) = nvme_config.keep_alive_tmo() {
             self.keep_alive_tmo = Some(keep_alive_tmo);
         }
+        if self.io_tmo.is_none() {
+            if let Some(io_tmo) = publish_context.io_timeout() {
+                self.io_tmo = Some(*io_tmo);
+            }
+        }
+
         Ok(())
     }
 
@@ -221,18 +235,16 @@ impl Attach for NvmfAttach {
             .get_device()?
             .ok_or_else(|| DeviceError::new("NVMe device not found"))?;
         let dev_name = device.sysname().to_str().unwrap();
-        let major = DEVICE_REGEX
-            .captures(dev_name)
-            .ok_or_else(|| {
-                DeviceError::new(&format!(
-                    "NVMe device \"{}\" does not match \"{}\"",
-                    dev_name, *DEVICE_REGEX,
-                ))
-            })?
-            .get(1)
-            .unwrap()
-            .as_str();
-        let pattern = format!("/sys/class/block/nvme{major}c*n1/queue");
+        let captures = DEVICE_REGEX.captures(dev_name).ok_or_else(|| {
+            DeviceError::new(&format!(
+                "NVMe device \"{}\" does not match \"{}\"",
+                dev_name, *DEVICE_REGEX,
+            ))
+        })?;
+        let major = captures.get(1).unwrap().as_str();
+        let nid = captures.get(2).unwrap().as_str();
+
+        let pattern = format!("/sys/class/block/nvme{major}c*n{nid}/queue");
         let glob = glob(&pattern).unwrap();
         let result = glob
             .into_iter()
@@ -300,6 +312,48 @@ impl Detach for NvmfDetach {
     fn devnqn(&self) -> &str {
         &self.nqn
     }
+}
+
+/// Get the sysfs block device queue path for the given udev::Device.
+fn block_dev_q(device: &Device) -> Result<String, DeviceError> {
+    let dev_name = device.sysname().to_str().unwrap();
+    let captures = DEVICE_REGEX.captures(dev_name).ok_or_else(|| {
+        DeviceError::new(&format!(
+            "NVMe device \"{}\" does not match \"{}\"",
+            dev_name, *DEVICE_REGEX,
+        ))
+    })?;
+    let major = captures.get(1).unwrap().as_str();
+    let nid = captures.get(2).unwrap().as_str();
+    Ok(format!("/sys/class/block/nvme{major}c*n{nid}/queue"))
+}
+
+/// Check if the given device is a valid NVMf device.
+/// # NOTE
+/// In older kernels when a device with an existing mount is lost, the nvmf controller
+/// is lost, but the block device remains, in a broken state.
+/// On newer kernels, the block device is also gone.
+pub(crate) fn match_device<'a>(
+    device: &'a Device,
+    key: &str,
+    warn_bad: &std::sync::atomic::AtomicBool,
+) -> Result<Option<&'a str>, DeviceError> {
+    let Some(devname) = match_nvmf_device(device, key) else {
+        return Ok(None);
+    };
+
+    let glob = glob(&block_dev_q(device)?).unwrap();
+    if !glob.into_iter().any(|glob_result| glob_result.is_ok()) {
+        if warn_bad.load(std::sync::atomic::Ordering::Relaxed) {
+            let name = device.sysname().to_string_lossy();
+            warn!("Block device {name} for volume {key} has no controller!");
+            // todo: shoot-down the stale mounts?
+            warn_bad.store(false, std::sync::atomic::Ordering::Relaxed);
+        }
+        return Ok(None);
+    }
+
+    Ok(Some(devname))
 }
 
 /// Check for the presence of nvme tcp kernel module.

@@ -307,17 +307,22 @@ def identify_namespace(device):
 
 def nvme_set_reconnect_delay_all(nqn, delay=10):
     for controller in nvme_find_controllers(nqn):
-        nvme_controller_set_reconnect_delay(controller, delay)
+        nvme_controller_set_param(controller, "reconnect_delay", delay)
 
 
 def nvme_set_reconnect_delay(uri, delay=10):
     controller = nvme_find_controller(uri)
-    nvme_controller_set_reconnect_delay(controller, delay)
+    nvme_controller_set_param(controller, "reconnect_delay", delay)
 
 
-def nvme_controller_set_reconnect_delay(controller, delay=10):
+def nvme_set_ctrl_loss_tmo(uri, ctrl_loss_tmo=10):
+    controller = nvme_find_controller(uri)
+    nvme_controller_set_param(controller, "ctrl_loss_tmo", ctrl_loss_tmo)
+
+
+def nvme_controller_set_param(controller, name: str, value: int):
     controller = controller.get("Controller")
-    command = f"echo {delay} | sudo tee -a /sys/class/nvme/{controller}/reconnect_delay"
+    command = f"echo {value} | sudo tee -a /sys/class/nvme/{controller}/{name}"
     print(command)
     subprocess.run(command, check=True, shell=True, capture_output=True)
 
@@ -325,3 +330,12 @@ def nvme_controller_set_reconnect_delay(controller, delay=10):
 @retry(wait_fixed=100, stop_max_attempt_number=40)
 def wait_nvme_find_device(uri):
     return nvme_find_device(uri)
+
+
+@retry(wait_fixed=100, stop_max_attempt_number=40)
+def wait_nvme_gone_device(uri, nqn=None):
+    if nqn is None:
+        u = urlparse(uri)
+        nqn = u.path[1:]
+    devs = nvme_find_subsystem_devices(nqn)
+    assert len(devs) == 0
