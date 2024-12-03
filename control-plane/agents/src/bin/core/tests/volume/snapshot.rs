@@ -293,7 +293,7 @@ async fn snapshot_timeout() {
             .with_min_req_timeout(None)
     }
     let req_timeout = Duration::from_millis(800);
-    let grpc_timeout = Duration::from_millis(250);
+    let grpc_timeout = Duration::from_millis(500);
 
     let cluster = ClusterBuilder::builder()
         .with_rest(true)
