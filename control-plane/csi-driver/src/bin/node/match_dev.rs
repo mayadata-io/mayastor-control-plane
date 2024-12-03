@@ -1,5 +1,6 @@
 //! Utility functions for matching a udev record against a known device type.
 
+use crate::error::DeviceError;
 use udev::Device;
 
 macro_rules! require {
@@ -71,4 +72,14 @@ pub(super) fn match_nvmf_device<'a>(device: &'a Device, key: &str) -> Option<&'a
     require!(let devname = device.property_value("DEVNAME"));
 
     Some(devname)
+}
+
+/// Match the device, if it's a nvmef device, but only if it's a valid block device.
+/// See [`super::dev::nvmf::match_device`].
+pub(super) fn match_nvmf_device_valid<'a>(
+    device: &'a Device,
+    key: &str,
+) -> Result<Option<&'a str>, DeviceError> {
+    let cell = std::sync::atomic::AtomicBool::new(true);
+    super::dev::nvmf::match_device(device, key, &cell)
 }
