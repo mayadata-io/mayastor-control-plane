@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+SCRIPT_DIR="$(dirname "$0")"
+
+# Cleans up the deployer's leftovers
+"$SCRIPT_DIR"/../rust/deployer-cleanup.sh || true
+
 # Cleans up the iptables rules added by bdd tests
 
 set -euo pipefail

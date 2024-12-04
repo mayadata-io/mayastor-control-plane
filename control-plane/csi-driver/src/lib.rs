@@ -71,3 +71,5 @@ pub mod limiter;
 /// Contains tools to advertise the same set of capabilities across different
 /// CSI microservices.
 pub mod plugin_capabilities;
+/// Request Tracing.
+pub mod trace;
