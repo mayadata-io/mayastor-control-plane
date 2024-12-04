@@ -27,7 +27,8 @@ use std::{
     collections::HashMap, env, fs, future::Future, io::ErrorKind, net::SocketAddr, str::FromStr,
 };
 use tokio::net::UnixListener;
-use tonic::{codegen::tokio_stream::wrappers::UnixListenerStream, transport::Server};
+use tokio_stream::wrappers::UnixListenerStream;
+use tonic::transport::Server;
 use tracing::{debug, error, info};
 
 const GRPC_PORT: u16 = 50051;
