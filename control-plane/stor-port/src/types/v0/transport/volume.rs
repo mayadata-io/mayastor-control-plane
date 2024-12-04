@@ -648,13 +648,16 @@ pub struct UnpublishVolume {
     /// the nexus. Note: this option should be used only when we know the node will not become
     /// accessible again and it is safe to do so.
     force: bool,
+    /// The frontend node that was connected to volume and is unpublishing now.
+    pub frontend_nodes: Vec<String>,
 }
 impl UnpublishVolume {
     /// Create a new `UnpublishVolume` for the given uuid.
-    pub fn new(uuid: &VolumeId, force: bool) -> Self {
+    pub fn new(uuid: &VolumeId, force: bool, frontend_nodes: Vec<String>) -> Self {
         Self {
             uuid: uuid.clone(),
             force,
+            frontend_nodes,
         }
     }
     /// It's a force `Self`.

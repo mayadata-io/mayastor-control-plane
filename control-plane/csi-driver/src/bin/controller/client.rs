@@ -83,6 +83,7 @@ impl From<clients::tower::Error<RestJsonError>> for ApiClientError {
                         StatusCode::PRECONDITION_FAILED => Self::PreconditionFailed(detailed),
                         StatusCode::BAD_REQUEST => Self::InvalidArgument(detailed),
                         StatusCode::NOT_ACCEPTABLE => Self::NotAcceptable(detailed),
+                        StatusCode::UNAUTHORIZED => Self::NotAcceptable(detailed),
                         status => Self::GenericOperation(status, detailed),
                     }
                 }
@@ -365,11 +366,12 @@ impl RestApiClient {
         &self,
         volume_id: &uuid::Uuid,
         force: bool,
+        frontend_host: Option<&str>,
     ) -> Result<(), ApiClientError> {
         Self::delete_idempotent(
             self.rest_client
                 .volumes_api()
-                .del_volume_target(volume_id, Some(force))
+                .del_volume_target(volume_id, Some(force), frontend_host)
                 .await,
             true,
         )?;

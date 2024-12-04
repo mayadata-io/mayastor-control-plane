@@ -113,3 +113,9 @@ Scenario: list existing volumes with pagination max entries set to 0
     When a ListVolumesRequest is sent to CSI controller with max_entries set to 0
     Then all volumes should be returned
     And the next token should be empty
+
+Scenario: unpublish volume from non-frontend node
+    Given a 2 replica volume published on a node
+    When the ControllerUnpublishVolume request arrives from a non-frontend node
+    Then nvmf target which exposes the volume should not be destroyed
+    And volume should remain as published

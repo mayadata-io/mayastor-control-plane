@@ -412,6 +412,26 @@ impl ResourcePublishing for OperationGuardArc<VolumeSpec> {
             .await?;
 
         let volume_target = spec_clone.target().expect("already validated");
+        let frontend_nodes = &request.frontend_nodes;
+        tracing::debug!("unpublish_volume: frontend nodes {frontend_nodes:?}");
+        if !frontend_nodes.is_empty() {
+            if let Some(tgt_cfg) = spec_clone.active_config() {
+                for unode in frontend_nodes {
+                    if !tgt_cfg.frontend().nodename_allowed(unode.as_str()) {
+                        self.validate_update_step(
+                            registry,
+                            Err(SvcError::FrontendNodeNotAllowed {
+                                node: unode.to_string(),
+                                vol_id: request.uuid.to_string(),
+                            }),
+                            &spec_clone,
+                        )
+                        .await?;
+                    }
+                }
+            }
+        }
+
         let result = match specs.nexus_opt(volume_target.nexus()).await? {
             None => Ok(()),
             Some(mut nexus) => {

@@ -974,7 +974,11 @@ async fn destroy_rebuilding_nexus() {
         assert!(child.uri.starts_with("nvmf"), "uri: {}", child.uri);
 
         volumes_api
-            .del_volume_target(&volume_1.state.uuid, None)
+            .del_volume_target(
+                &volume_1.state.uuid,
+                None,
+                Some(cluster.csi_node(0).as_str()),
+            )
             .await
             .unwrap();
 
