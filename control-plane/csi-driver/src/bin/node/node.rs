@@ -26,7 +26,7 @@ use rpc::{
 use nix::{errno::Errno, sys};
 use std::{collections::HashMap, path::Path, time::Duration, vec::Vec};
 use tonic::{Code, Request, Response, Status};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 macro_rules! failure {
@@ -233,13 +233,14 @@ impl node_server::Node for Node {
     /// and/or other arguments if the volume has MULTI_NODE capability (i.e.,
     /// access_mode is either MULTI_NODE_READER_ONLY, MULTI_NODE_SINGLE_WRITER
     /// or MULTI_NODE_MULTI_WRITER).
+    #[instrument(err, fields(volume.uuid = request.get_ref().volume_id), skip(self))]
     async fn node_publish_volume(
         &self,
         request: Request<NodePublishVolumeRequest>,
     ) -> Result<Response<NodePublishVolumeResponse>, Status> {
         let msg = request.into_inner();
 
-        trace!("node_publish_volume {:?}", msg);
+        let req = csi_driver::trace::CsiRequest::new_info("Node Publish Volume");
 
         if msg.volume_id.is_empty() {
             return Err(failure!(
@@ -304,6 +305,8 @@ impl node_server::Node for Node {
                 publish_block_volume(&msg).await?;
             }
         }
+
+        req.info_ok();
         Ok(Response::new(NodePublishVolumeResponse {}))
     }
 
@@ -315,13 +318,14 @@ impl node_server::Node for Node {
     /// given node and returns a success.
     ///
     /// This operation MUST be idempotent.
+    #[instrument(err, fields(volume.uuid = request.get_ref().volume_id), skip(self))]
     async fn node_unpublish_volume(
         &self,
         request: Request<NodeUnpublishVolumeRequest>,
     ) -> Result<Response<NodeUnpublishVolumeResponse>, Status> {
         let msg = request.into_inner();
 
-        trace!("node_unpublish_volume {:?}", msg);
+        let req = csi_driver::trace::CsiRequest::new_info("Node Unpublish Volume");
 
         if msg.volume_id.is_empty() {
             return Err(failure!(
@@ -364,16 +368,19 @@ impl node_server::Node for Node {
                 unpublish_block_volume(&msg)?;
             }
         }
+
+        req.info_ok();
         Ok(Response::new(NodeUnpublishVolumeResponse {}))
     }
 
     /// Get volume stats method evaluates and returns capacity metrics.
+    #[instrument(err, fields(volume.uuid = request.get_ref().volume_id), skip(self))]
     async fn node_get_volume_stats(
         &self,
         request: Request<NodeGetVolumeStatsRequest>,
     ) -> Result<Response<NodeGetVolumeStatsResponse>, Status> {
         let msg = request.into_inner();
-        trace!("node_get_volume_stats {:?}", msg);
+        let req = csi_driver::trace::CsiRequest::new_trace("Node Get Volume Stats");
         if msg.volume_id.is_empty() {
             return Err(failure!(
                 Code::InvalidArgument,
@@ -390,28 +397,30 @@ impl node_server::Node for Node {
 
         let volume_path = Path::new(&msg.volume_path);
         if volume_path.exists() {
-            // Check if its a filesystem.
+            // Check if it's a filesystem.
             if volume_path.is_dir() {
-                trace!("Getting statfs metrics for : {:?}", volume_path);
                 match sys::statfs::statfs(&*msg.volume_path) {
-                    Ok(info) => Ok(Response::new(NodeGetVolumeStatsResponse {
-                        usage: vec![
-                            csi::VolumeUsage {
-                                total: info.blocks() as i64 * info.block_size(),
-                                unit: csi::volume_usage::Unit::Bytes as i32,
-                                available: info.blocks_available() as i64 * info.block_size(),
-                                used: (info.blocks() - info.blocks_free()) as i64
-                                    * info.block_size(),
-                            },
-                            csi::VolumeUsage {
-                                total: info.files() as i64,
-                                unit: csi::volume_usage::Unit::Inodes as i32,
-                                available: info.files_free() as i64,
-                                used: (info.files() - info.files_free()) as i64,
-                            },
-                        ],
-                        volume_condition: None,
-                    })),
+                    Ok(info) => {
+                        req.trace_ok();
+                        Ok(Response::new(NodeGetVolumeStatsResponse {
+                            usage: vec![
+                                csi::VolumeUsage {
+                                    total: info.blocks() as i64 * info.block_size(),
+                                    unit: csi::volume_usage::Unit::Bytes as i32,
+                                    available: info.blocks_available() as i64 * info.block_size(),
+                                    used: (info.blocks() - info.blocks_free()) as i64
+                                        * info.block_size(),
+                                },
+                                csi::VolumeUsage {
+                                    total: info.files() as i64,
+                                    unit: csi::volume_usage::Unit::Inodes as i32,
+                                    available: info.files_free() as i64,
+                                    used: (info.files() - info.files_free()) as i64,
+                                },
+                            ],
+                            volume_condition: None,
+                        }))
+                    }
                     Err(err) => match err {
                         Errno::ENOENT => Err(Status::new(Code::NotFound, err.to_string())),
                         Errno::EIO => Err(Status::new(Code::Internal, err.to_string())),
@@ -431,12 +440,13 @@ impl node_server::Node for Node {
         }
     }
 
+    #[instrument(err, fields(volume.uuid = request.get_ref().volume_id), skip(self))]
     async fn node_expand_volume(
         &self,
         request: Request<NodeExpandVolumeRequest>,
     ) -> Result<Response<NodeExpandVolumeResponse>, Status> {
         let args = request.into_inner();
-        trace!(volume.uuid = %args.volume_id, request = ?args);
+        let req = csi_driver::trace::CsiRequest::new_info("Node Expand Volume");
 
         //===============================CsiAccessType=============================================
         // A type alias for better readability, and also easier conversions
@@ -599,20 +609,18 @@ impl node_server::Node for Node {
             .await
             .map_err(|err| failure!(Code::Internal, "{}", err))?;
 
-        debug!(
-            size_bytes = required_bytes,
-            "Expansion succeeded for volume {vol_uuid}"
-        );
+        tracing::info!(size_bytes = required_bytes, "{}", req.log_str());
         success_result
     }
 
+    #[instrument(err, fields(volume.uuid = request.get_ref().volume_id), skip(self))]
     async fn node_stage_volume(
         &self,
         request: Request<NodeStageVolumeRequest>,
     ) -> Result<Response<NodeStageVolumeResponse>, Status> {
         let msg = request.into_inner();
 
-        trace!("node_stage_volume {:?}", msg);
+        let req = csi_driver::trace::CsiRequest::new_info("Node Stage Volume");
 
         if msg.volume_id.is_empty() {
             return Err(failure!(
@@ -773,16 +781,18 @@ impl node_server::Node for Node {
             }
         }
 
+        req.info_ok();
         Ok(Response::new(NodeStageVolumeResponse {}))
     }
 
+    #[instrument(err, fields(volume.uuid = request.get_ref().volume_id), skip(self))]
     async fn node_unstage_volume(
         &self,
         request: Request<NodeUnstageVolumeRequest>,
     ) -> Result<Response<NodeUnstageVolumeResponse>, Status> {
         let msg = request.into_inner();
 
-        trace!("node_unstage_volume {:?}", msg);
+        let req = csi_driver::trace::CsiRequest::new_info("Node Unstage Volume");
 
         if msg.volume_id.is_empty() {
             return Err(failure!(
@@ -833,7 +843,8 @@ impl node_server::Node for Node {
             format!("Failed to unstage volume {}:", &msg.volume_id),
         )
         .await?;
-        info!("Volume {} unstaged", &msg.volume_id);
+
+        req.info_ok();
         Ok(Response::new(NodeUnstageVolumeResponse {}))
     }
 }
