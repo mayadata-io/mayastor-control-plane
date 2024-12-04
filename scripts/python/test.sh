@@ -19,7 +19,6 @@ REPORT="$ROOT_DIR/report.xml"
 
 cleanup() {
   "$SCRIPT_DIR"/test-residue-cleanup.sh || true
-  "$SCRIPT_DIR"/../rust/deployer-cleanup.sh || true
 }
 
 cleanup_handler() {
