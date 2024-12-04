@@ -1,5 +1,6 @@
 //! Utility functions for mounting and unmounting filesystems.
 use crate::filesystem_ops::FileSystem;
+use crate::runtime;
 use csi_driver::filesystem::FileSystem as Fs;
 use devinfo::mountinfo::{MountInfo, SafeMountIter};
 
@@ -130,184 +131,229 @@ fn show(options: &[String]) -> String {
     list.join(",")
 }
 
-/// Mount a device to a directory (mountpoint)
-pub(crate) fn filesystem_mount(
+pub(crate) async fn filesystem_mount(
     device: &str,
     target: &str,
     fstype: &FileSystem,
     options: &[String],
 ) -> Result<Mount, Error> {
-    let mut flags = MountFlags::empty();
+    let device = device.to_string();
+    let target = target.to_string();
+    let fstype = fstype.clone();
+    let options: Vec<String> = options.to_vec();
 
-    let (readonly, value) = parse(options);
+    runtime::spawn_blocking(move || {
+        let mut flags = MountFlags::empty();
 
-    if readonly {
-        flags.insert(MountFlags::RDONLY);
-    }
+        let (readonly, value) = parse(&options);
 
-    // I'm not certain if it's fine to pass "" so keep existing behaviour
-    let mount = if value.is_empty() {
-        Mount::builder()
-    } else {
-        Mount::builder().data(&value)
-    }
-    .fstype(FilesystemType::Manual(fstype.as_ref()))
-    .flags(flags)
-    .mount(device, target)?;
+        if readonly {
+            flags.insert(MountFlags::RDONLY);
+        }
 
-    debug!(
-        "Filesystem ({}) on device {} mounted onto target {} (options: {})",
-        fstype,
-        device,
-        target,
-        show(options)
-    );
+        // I'm not certain if it's fine to pass "" so keep existing behaviour
+        let mount_builder = if value.is_empty() {
+            Mount::builder()
+        } else {
+            Mount::builder().data(&value)
+        }
+        .fstype(FilesystemType::Manual(fstype.as_ref()))
+        .flags(flags);
 
-    Ok(mount)
+        let mount = mount_builder.mount(&device, &target)?;
+
+        debug!(
+            "Filesystem ({}) on device {} mounted onto target {} (options: {})",
+            fstype,
+            device,
+            target,
+            show(&options)
+        );
+
+        Ok(mount)
+    })
+    .await?
 }
 
-/// Unmount a device from a directory (mountpoint)
+/// Unmount a device from a directory (mountpoint).
 /// Should not be used for removing bind mounts.
-pub(crate) fn filesystem_unmount(target: &str) -> Result<(), Error> {
-    let flags = UnmountFlags::empty();
-    // read more about the umount system call and it's flags at `man 2 umount`
-    unmount(target, flags)?;
+pub(crate) async fn filesystem_unmount(target: &str) -> Result<(), Error> {
+    let target = target.to_string();
 
-    debug!("Target {} unmounted", target);
+    runtime::spawn_blocking(move || {
+        let flags = UnmountFlags::empty();
 
-    Ok(())
+        unmount(&target, flags)?;
+
+        debug!("Target {} unmounted", target);
+
+        Ok(())
+    })
+    .await?
 }
 
 /// Bind mount a source path to a target path.
 /// Supports both directories and files.
-pub(crate) fn bind_mount(source: &str, target: &str, file: bool) -> Result<Mount, Error> {
-    let mut flags = MountFlags::empty();
+pub(crate) async fn bind_mount(source: &str, target: &str, file: bool) -> Result<Mount, Error> {
+    let source = source.to_string();
+    let target = target.to_string();
 
-    flags.insert(MountFlags::BIND);
+    runtime::spawn_blocking(move || {
+        let mut flags = MountFlags::empty();
+        flags.insert(MountFlags::BIND);
 
-    if file {
-        flags.insert(MountFlags::RDONLY);
-    }
+        if file {
+            flags.insert(MountFlags::RDONLY);
+        }
 
-    let mount = Mount::builder()
-        .fstype(FilesystemType::Manual("none"))
-        .flags(flags)
-        .mount(source, target)?;
+        let mount = Mount::builder()
+            .fstype(FilesystemType::Manual("none"))
+            .flags(flags)
+            .mount(&source, &target)?;
 
-    debug!("Source {} bind mounted onto target {}", source, target);
+        debug!("Source {} bind mounted onto target {}", source, target);
 
-    Ok(mount)
+        Ok(mount)
+    })
+    .await?
 }
 
 /// Bind remount a path to modify mount options.
 /// Assumes that target has already been bind mounted.
-pub(crate) fn bind_remount(target: &str, options: &[String]) -> Result<Mount, Error> {
-    let mut flags = MountFlags::empty();
+pub(crate) async fn bind_remount(target: &str, options: &[String]) -> Result<Mount, Error> {
+    let target = target.to_string();
+    let options = options.to_vec();
 
-    let (readonly, value) = parse(options);
+    runtime::spawn_blocking(move || {
+        let mut flags = MountFlags::empty();
+        let (readonly, value) = parse(&options);
 
-    flags.insert(MountFlags::BIND);
+        flags.insert(MountFlags::BIND);
 
-    if readonly {
-        flags.insert(MountFlags::RDONLY);
-    }
+        if readonly {
+            flags.insert(MountFlags::RDONLY);
+        }
 
-    flags.insert(MountFlags::REMOUNT);
+        flags.insert(MountFlags::REMOUNT);
 
-    let mount = if value.is_empty() {
-        Mount::builder()
-    } else {
-        Mount::builder().data(&value)
-    }
-    .fstype(FilesystemType::Manual("none"))
-    .flags(flags)
-    .mount("none", target)?;
+        let mount = if value.is_empty() {
+            Mount::builder()
+        } else {
+            Mount::builder().data(&value)
+        }
+        .fstype(FilesystemType::Manual("none"))
+        .flags(flags)
+        .mount("none", &target)?;
 
-    debug!(
-        "Target {} bind remounted (options: {})",
-        target,
-        show(options)
-    );
+        debug!(
+            "Target {} bind remounted (options: {})",
+            target,
+            show(&options)
+        );
 
-    Ok(mount)
+        Ok(mount)
+    })
+    .await?
 }
 
 /// Unmounts a path that has previously been bind mounted.
 /// Should not be used for unmounting devices.
-pub(crate) fn bind_unmount(target: &str) -> Result<(), Error> {
-    let flags = UnmountFlags::empty();
+pub(crate) async fn bind_unmount(target: &str) -> Result<(), Error> {
+    let target = target.to_string();
 
-    unmount(target, flags)?;
+    runtime::spawn_blocking(move || {
+        let flags = UnmountFlags::empty();
+        unmount(&target, flags)?;
 
-    debug!("Target {} bind unmounted", target);
-
-    Ok(())
+        debug!("Target {} bind unmounted", target);
+        Ok(())
+    })
+    .await?
 }
 
 /// Remount existing mount as read only or read write.
-pub(crate) fn remount(target: &str, ro: bool) -> Result<Mount, Error> {
-    let mut flags = MountFlags::empty();
-    flags.insert(MountFlags::REMOUNT);
+pub(crate) async fn remount(target: &str, ro: bool) -> Result<Mount, Error> {
+    let target = target.to_string();
 
-    if ro {
-        flags.insert(MountFlags::RDONLY);
-    }
+    runtime::spawn_blocking(move || {
+        let mut flags = MountFlags::empty();
+        flags.insert(MountFlags::REMOUNT);
 
-    let mount = Mount::builder()
-        .fstype(FilesystemType::Manual("none"))
-        .flags(flags)
-        .mount("", target)?;
+        if ro {
+            flags.insert(MountFlags::RDONLY);
+        }
 
-    debug!("Target {} remounted with {}", target, flags.bits());
+        let mount = Mount::builder()
+            .fstype(FilesystemType::Manual("none"))
+            .flags(flags)
+            .mount("", &target)?;
 
-    Ok(mount)
+        debug!("Target {} remounted with {}", target, flags.bits());
+
+        Ok(mount)
+    })
+    .await?
 }
 
 /// Mount a block device
-pub(crate) fn blockdevice_mount(
+pub(crate) async fn blockdevice_mount(
     source: &str,
     target: &str,
     readonly: bool,
 ) -> Result<Mount, Error> {
-    debug!("Mounting {} ...", source);
+    let source = source.to_string();
+    let target = target.to_string();
 
-    let mut flags = MountFlags::empty();
-    flags.insert(MountFlags::BIND);
+    runtime::spawn_blocking(move || {
+        debug!("Mounting {} ...", source);
 
-    let mount = Mount::builder()
-        .fstype(FilesystemType::Manual("none"))
-        .flags(flags)
-        .mount(source, target)?;
-    info!("Block device {} mounted to {}", source, target,);
-
-    if readonly {
-        flags.insert(MountFlags::REMOUNT);
-        flags.insert(MountFlags::RDONLY);
+        let mut flags = MountFlags::empty();
+        flags.insert(MountFlags::BIND);
 
         let mount = Mount::builder()
-            .fstype(FilesystemType::Manual(""))
+            .fstype(FilesystemType::Manual("none"))
             .flags(flags)
-            .mount("", target)?;
-        info!("Remounted block device {} (readonly) to {}", source, target);
-        return Ok(mount);
-    }
+            .mount(&source, &target)?;
 
-    Ok(mount)
+        info!("Block device {} mounted to {}", source, target);
+
+        if readonly {
+            flags.insert(MountFlags::REMOUNT);
+            flags.insert(MountFlags::RDONLY);
+
+            let mount = Mount::builder()
+                .fstype(FilesystemType::Manual(""))
+                .flags(flags)
+                .mount("", &target)?;
+
+            info!("Remounted block device {} (readonly) to {}", source, target);
+            return Ok(mount);
+        }
+
+        Ok(mount)
+    })
+    .await?
 }
 
 /// Unmount a block device.
-pub(crate) fn blockdevice_unmount(target: &str) -> Result<(), Error> {
-    let flags = UnmountFlags::empty();
+pub(crate) async fn blockdevice_unmount(target: &str) -> Result<(), Error> {
+    let target = target.to_string();
 
-    debug!(
-        "Unmounting block device {} (flags={}) ...",
-        target,
-        flags.bits()
-    );
+    runtime::spawn_blocking(move || {
+        let flags = UnmountFlags::empty();
 
-    unmount(target, flags)?;
-    info!("block device at {} has been unmounted", target);
-    Ok(())
+        debug!(
+            "Unmounting block device {} (flags={}) ...",
+            target,
+            flags.bits()
+        );
+
+        unmount(&target, flags)?;
+        info!("Block device at {} has been unmounted", target);
+
+        Ok(())
+    })
+    .await?
 }
 
 /// Waits until a device's filesystem is shutdown.
@@ -364,7 +410,7 @@ async fn wait_file_removal(
 }
 
 /// If the filesystem uuid doesn't match with the provided uuid, unmount the device.
-pub(crate) fn unmount_on_fs_id_diff(
+pub(crate) async fn unmount_on_fs_id_diff(
     device_path: &str,
     fs_staging_path: &str,
     volume_uuid: &Uuid,
@@ -374,7 +420,7 @@ pub(crate) fn unmount_on_fs_id_diff(
             return Ok(());
         }
     }
-    filesystem_unmount(fs_staging_path).map_err(|error| {
+    filesystem_unmount(fs_staging_path).await.map_err(|error| {
         format!(
             "Failed to unmount on fs id difference, device {device_path} from {fs_staging_path} for {volume_uuid}, {error}",
         )
