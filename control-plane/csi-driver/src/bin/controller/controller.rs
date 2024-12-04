@@ -254,8 +254,24 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         request: tonic::Request<CreateVolumeRequest>,
     ) -> Result<tonic::Response<CreateVolumeResponse>, tonic::Status> {
         let args = request.into_inner();
-        tracing::trace!(request = ?args);
+
         let _permit = self.create_volume_permit().await?;
+
+        // k8s uses names pvc-{uuid} and we use uuid further as ID in SPDK so we
+        // must require it.
+        let re = Regex::new(VOLUME_NAME_PATTERN).unwrap();
+        let volume_uuid = match re.captures(&args.name) {
+            Some(captures) => captures.get(1).unwrap().as_str().to_string(),
+            None => {
+                return Err(Status::invalid_argument(format!(
+                    "Expected the volume name in pvc-<UUID> format: {}",
+                    args.name
+                )))
+            }
+        };
+        tracing::Span::current().record("volume.uuid", volume_uuid.as_str());
+
+        let req = csi_driver::trace::CsiRequest::new_info("Create Volume");
 
         let volume_content_source = if let Some(source) = &args.volume_content_source {
             match &source.r#type {
@@ -283,20 +299,6 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         } else {
             None
         };
-
-        // k8s uses names pvc-{uuid} and we use uuid further as ID in SPDK so we
-        // must require it.
-        let re = Regex::new(VOLUME_NAME_PATTERN).unwrap();
-        let volume_uuid = match re.captures(&args.name) {
-            Some(captures) => captures.get(1).unwrap().as_str().to_string(),
-            None => {
-                return Err(Status::invalid_argument(format!(
-                    "Expected the volume name in pvc-<UUID> format: {}",
-                    args.name
-                )))
-            }
-        };
-        tracing::Span::current().record("volume.uuid", volume_uuid.as_str());
 
         check_volume_capabilities(&args.volume_capabilities)?;
 
@@ -342,8 +344,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
             Ok(volume) => {
                 check_existing_volume(&volume, replica_count, size, thin)?;
                 debug!(
-                    "Volume {} already exists and is compatible with requested config",
-                    volume_uuid
+                    "Volume {volume_uuid} already exists and is compatible with requested config"
                 );
             }
             // If the volume doesn't exist, create it.
@@ -412,6 +413,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
             accessible_topology: vt_mapper.volume_accessible_topology(),
         };
 
+        req.info_ok();
         Ok(Response::new(CreateVolumeResponse {
             volume: Some(volume),
         }))
@@ -422,7 +424,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         request: tonic::Request<DeleteVolumeRequest>,
     ) -> Result<tonic::Response<DeleteVolumeResponse>, tonic::Status> {
         let args = request.into_inner();
-        tracing::trace!(volume.uuid = %args.volume_id, request = ?args);
+        let req = csi_driver::trace::CsiRequest::new_info("Delete Volume");
         let volume_uuid = Uuid::parse_str(&args.volume_id).map_err(|_e| {
             Status::invalid_argument(format!("Malformed volume UUID: {}", args.volume_id))
         })?;
@@ -430,13 +432,14 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         RestApiClient::get_client()
             .delete_volume(&volume_uuid)
             .await
-            .map_err(|e| {
+            .map_err(|error| {
                 Status::internal(format!(
-                    "Failed to delete volume {}, error = {:?}",
-                    args.volume_id, e
+                    "Failed to delete volume {}, error = {error:?}",
+                    args.volume_id
                 ))
             })?;
 
+        req.info_ok();
         Ok(Response::new(DeleteVolumeResponse {}))
     }
 
@@ -446,7 +449,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         request: tonic::Request<ControllerPublishVolumeRequest>,
     ) -> Result<tonic::Response<ControllerPublishVolumeResponse>, tonic::Status> {
         let args = request.into_inner();
-        tracing::trace!(volume.uuid = %args.volume_id, request = ?args);
+        let req = csi_driver::trace::CsiRequest::new_info("Publish Volume");
         if args.readonly {
             return Err(Status::invalid_argument(
                 "Read-only volumes are not supported",
@@ -489,8 +492,8 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
                 Some(target) => {
                     if target.protocol != Some(protocol) {
                         let m = format!(
-                            "Volume {} already shared via different protocol: {:?}",
-                            volume_id, target.protocol,
+                            "Volume {volume_id} already shared via different protocol: {:?}",
+                            target.protocol,
                         );
                         error!("{}", m);
                         return Err(Status::failed_precondition(m));
@@ -548,10 +551,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
                         .await?;
 
                     if let Some((node, uri)) = get_volume_share_location(&v) {
-                        debug!(
-                        "Volume {} successfully published on node {} via {}",
-                        volume_id, node, uri
-                    );
+                        debug!("Volume {volume_id} successfully published on node {node} via {uri}");
                         uri
                     } else {
                         let m = format!(
@@ -565,22 +565,18 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
 
         publish_context.insert("uri".to_string(), uri);
 
-        debug!(
-            "Publish context for volume {}: {:?}",
-            volume_id, publish_context
-        );
+        tracing::info!(?publish_context, "{}", req.log_str());
         Ok(Response::new(ControllerPublishVolumeResponse {
             publish_context,
         }))
     }
-
     #[instrument(err, fields(volume.uuid = %request.get_ref().volume_id), skip(self))]
     async fn controller_unpublish_volume(
         &self,
         request: tonic::Request<ControllerUnpublishVolumeRequest>,
     ) -> Result<tonic::Response<ControllerUnpublishVolumeResponse>, tonic::Status> {
         let args = request.into_inner();
-        tracing::trace!(volume.uuid = %args.volume_id, request = ?args);
+        let req = csi_driver::trace::CsiRequest::new_info("Unpublish Volume");
 
         let volume_uuid = Uuid::parse_str(&args.volume_id).map_err(|_e| {
             Status::invalid_argument(format!("Malformed volume UUID: {}", args.volume_id))
@@ -616,7 +612,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
                 ))
             })?;
 
-        debug!("Volume {} successfully unpublished", args.volume_id);
+        req.info_ok();
         Ok(Response::new(ControllerUnpublishVolumeResponse {}))
     }
 
@@ -626,9 +622,8 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         request: tonic::Request<ValidateVolumeCapabilitiesRequest>,
     ) -> Result<tonic::Response<ValidateVolumeCapabilitiesResponse>, tonic::Status> {
         let args = request.into_inner();
-        tracing::trace!(volume.uuid = %args.volume_id, request = ?args);
+        let _ = csi_driver::trace::CsiRequest::new_dbg("Validate Volume Capabilities");
 
-        debug!("Request to validate volume capabilities: {:?}", args);
         let volume_uuid = Uuid::parse_str(&args.volume_id).map_err(|_e| {
             Status::invalid_argument(format!("Malformed volume UUID: {}", args.volume_id))
         })?;
@@ -678,8 +673,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         request: tonic::Request<ListVolumesRequest>,
     ) -> Result<tonic::Response<ListVolumesResponse>, tonic::Status> {
         let args = request.into_inner();
-        tracing::trace!(request = ?args);
-
+        let req = csi_driver::trace::CsiRequest::new_trace("List Volumes");
         let max_entries = args.max_entries;
         if max_entries < 0 {
             return Err(Status::invalid_argument("max_entries can't be negative"));
@@ -711,8 +705,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
             })
             .collect();
 
-        debug!("Available k8s volumes: {:?}", entries);
-
+        tracing::trace!(?entries, "{}", req.log_str());
         Ok(Response::new(ListVolumesResponse {
             entries,
             next_token: volumes.next_token.map_or("".to_string(), |v| v.to_string()),
@@ -725,7 +718,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         request: tonic::Request<GetCapacityRequest>,
     ) -> Result<tonic::Response<GetCapacityResponse>, tonic::Status> {
         let args = request.into_inner();
-        tracing::trace!(request = ?args);
+        let _ = csi_driver::trace::CsiRequest::new_trace("Get Node(s) Capacity");
 
         // Check capabilities.
         check_volume_capabilities(&args.volume_capabilities)?;
@@ -738,7 +731,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         };
 
         let pools: Vec<Pool> = if let Some(node) = node {
-            debug!("Calculating pool capacity for node {}", node);
+            debug!("Calculating pool capacity for node {node}");
             RestApiClient::get_client()
                 .get_node_pools(node)
                 .await
@@ -752,9 +745,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
             RestApiClient::get_client()
                 .list_pools()
                 .await
-                .map_err(|e| {
-                    Status::internal(format!("Failed to list all pools, error = {e:?}",))
-                })?
+                .map_err(|e| Status::internal(format!("Failed to list all pools, error = {e:?}")))?
         };
 
         let available_capacity: i64 = pools.into_iter().fold(0, |acc, p| match p.state {
@@ -811,7 +802,6 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         request: tonic::Request<CreateSnapshotRequest>,
     ) -> Result<tonic::Response<CreateSnapshotResponse>, tonic::Status> {
         let request = request.into_inner();
-        tracing::trace!(volume.uuid = %request.source_volume_id, snapshot.uuid = %request.name, ?request);
 
         let volume_uuid = Uuid::parse_str(&request.source_volume_id).map_err(|_e| {
             Status::invalid_argument(format!(
@@ -836,6 +826,8 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         let snap_uuid = Uuid::parse_str(&snapshot_uuid_str).map_err(|_e| {
             Status::invalid_argument(format!("Malformed snapshot ID: {}", request.name))
         })?;
+
+        let req = csi_driver::trace::CsiRequest::new_info("Create Snapshot");
         let create_params = CreateSnapshotParams::try_from(&request.parameters)?;
 
         // Get the volume object. Extract the app node endpoint if quiesce is requested.
@@ -912,6 +904,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
             snapshot_creation_result
         }?;
 
+        req.info_ok();
         Ok(tonic::Response::new(CreateSnapshotResponse {
             snapshot: Some(snapshot_to_csi(snapshot)),
         }))
@@ -922,8 +915,8 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         &self,
         request: tonic::Request<DeleteSnapshotRequest>,
     ) -> Result<tonic::Response<DeleteSnapshotResponse>, tonic::Status> {
+        let req = csi_driver::trace::CsiRequest::new_info("Delete Snapshot");
         let args = request.into_inner();
-        tracing::trace!(snapshot.uuid = %args.snapshot_id, ?args);
 
         let snapshot_uuid = Uuid::parse_str(&args.snapshot_id).map_err(|_e| {
             Status::invalid_argument(format!("Malformed snapshot UUID: {}", args.snapshot_id))
@@ -939,6 +932,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
                 ))
             })?;
 
+        req.info_ok();
         Ok(Response::new(DeleteSnapshotResponse {}))
     }
 
@@ -982,13 +976,13 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         }))
     }
 
-    #[instrument(err, skip(self))]
+    #[instrument(err, fields(volume.uuid = request.get_ref().volume_id), skip(self))]
     async fn controller_expand_volume(
         &self,
         request: Request<ControllerExpandVolumeRequest>,
     ) -> Result<Response<ControllerExpandVolumeResponse>, Status> {
         let args = request.into_inner();
-        trace!(volume.uuid = %args.volume_id, request = ?args);
+        let req = csi_driver::trace::CsiRequest::new_info("Expand Volume");
 
         let vol_uuid = Uuid::parse_str(&args.volume_id).map_err(|error| {
             Status::invalid_argument(format!(
@@ -1036,10 +1030,7 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
                 error => Status::from(error),
             })?;
 
-        debug!(
-            size_bytes = requested_size,
-            "Expansion succeeded for volume {vol_uuid}"
-        );
+        tracing::info!(size_bytes = requested_size, "{}", req.log_str());
         Ok(tonic::Response::new(ControllerExpandVolumeResponse {
             capacity_bytes: vol.spec.size as i64,
             node_expansion_required,
