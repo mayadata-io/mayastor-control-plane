@@ -967,6 +967,7 @@ dependencies = [
  "sys-mount",
  "sysfs",
  "tokio",
+ "tokio-stream",
  "tonic 0.10.2",
  "tonic-build",
  "tower",
