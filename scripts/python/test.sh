@@ -19,7 +19,6 @@ export ROOT_DIR="$SCRIPT_DIR/../.."
 cleanup_handler() {
   ERROR=$?
   "$SCRIPT_DIR"/test-residue-cleanup.sh || true
-  "$SCRIPT_DIR"/../rust/deployer-cleanup.sh || true
   if [ $ERROR != 0 ]; then exit $ERROR; fi
 }
 
