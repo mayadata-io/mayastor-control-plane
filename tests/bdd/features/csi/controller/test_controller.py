@@ -962,7 +962,7 @@ def volume_target_should_not_be_destroyed():
     """nvmf target which exposes the volume should not be destroyed."""
     vol = ApiClient.volumes_api().get_volume(VOLUME4_UUID)
     assert str(vol.spec.target.protocol) == "nvmf", "Volume protocol mismatches"
-    assert vol.state.target["device_uri"].startswith(
+    assert vol.state.target["deviceUri"].startswith(
         ("nvmf://", "nvmf+tcp://", "nvmf+rdma+tcp://")
     ), "Volume share URI mismatches"
 
