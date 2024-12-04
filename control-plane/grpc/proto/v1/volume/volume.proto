@@ -323,6 +323,8 @@ message UnpublishVolumeRequest {
   // the nexus. Note: this option should be used only when we know the node will not become
   // accessible again and it is safe to do so.
   bool force = 2;
+  // frontend host requesting for volume unpublish.
+  repeated string frontend_nodes = 3;
 }
 
 // Share Volume request

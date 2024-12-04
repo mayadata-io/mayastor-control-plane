@@ -894,7 +894,11 @@ async fn disown_unused_replicas() {
 
     cluster.composer().pause(&node).await.unwrap();
     volumes_api
-        .del_volume_target(&volume.spec.uuid, Some(false))
+        .del_volume_target(
+            &volume.spec.uuid,
+            Some(false),
+            Some(cluster.csi_node(0).as_str()),
+        )
         .await
         .expect_err("io-engine is down");
     cluster.composer().kill(&node).await.unwrap();

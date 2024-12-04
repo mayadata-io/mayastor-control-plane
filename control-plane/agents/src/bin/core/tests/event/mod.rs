@@ -130,7 +130,10 @@ async fn events() {
     let vol_client = cluster.grpc_client().volume();
 
     vol_client
-        .unpublish(&UnpublishVolume::new(&volid, false), None)
+        .unpublish(
+            &UnpublishVolume::new(&volid, false, vec![cluster.csi_node(0).into()]),
+            None,
+        )
         .await
         .unwrap();
 

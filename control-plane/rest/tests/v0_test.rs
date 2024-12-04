@@ -3,7 +3,7 @@ use stor_port::types::v0::{
     transport::WatchResourceId,
 };
 
-use rest_client::RestClient;
+use rest_client::{versions::v0::RestJsonErrorKind, RestClient};
 
 use crate::models::PublishVolumeBody;
 use deployer_cluster::{Cluster, ClusterBuilder};
@@ -345,7 +345,7 @@ async fn client_test(cluster: &Cluster, auth: &bool) {
 
     let volume = client
         .volumes_api()
-        .del_volume_target(&volume_state.uuid, None)
+        .del_volume_target(&volume_state.uuid, None, Some(cluster.csi_node(0).as_str()))
         .await
         .unwrap();
     tracing::info!("Volume: {:#?}", volume);
@@ -479,4 +479,85 @@ async fn client_invalid_token() {
         _ => false,
     };
     assert!(unauthorized);
+}
+
+#[tokio::test]
+async fn unpublish_from_nonfrontend_node() {
+    let cluster = test_setup(&true).await;
+    let client = RestClient::new("https://localhost:8080", true, Some(bearer_token()))
+        .unwrap()
+        .v00();
+
+    let nodes = client.nodes_api().get_nodes(None).await.unwrap();
+    assert_eq!(nodes.len(), 2);
+    let io_engine1 = cluster.node(0);
+    let _ = client.pools_api().get_pools(None).await.unwrap();
+    let pool = client
+        .pools_api()
+        .put_node_pool(
+            io_engine1.as_str(),
+            "pooloop",
+            models::CreatePoolBody::new(vec![
+                "malloc:///malloc0?blk_size=512&size_mb=100&uuid=b940f4f2-d45d-4404-8167-3b0366f9e2b0",
+            ]),
+        )
+        .await
+        .unwrap();
+    // pool created
+    assert_eq!(
+        Some(&pool),
+        client.pools_api().get_pools(None).await.unwrap().first()
+    );
+
+    let volume_uuid: VolumeId = "058a95e5-cee6-4e81-b682-fe864ca99b9c".try_into().unwrap();
+    let volume = client
+        .volumes_api()
+        .put_volume(
+            &volume_uuid,
+            models::CreateVolumeBody::new(models::VolumePolicy::default(), 1, 12582912u64, false),
+        )
+        .await
+        .unwrap();
+
+    tracing::info!("Volume: {:#?}", volume);
+
+    assert_eq!(
+        volume,
+        client.volumes_api().get_volume(&volume_uuid).await.unwrap()
+    );
+
+    let volume = client
+        .volumes_api()
+        .put_volume_target(
+            &volume.state.uuid,
+            PublishVolumeBody::new_all(
+                HashMap::new(),
+                None,
+                io_engine1.to_string(),
+                models::VolumeShareProtocol::Nvmf,
+                None,
+                cluster.csi_node(0),
+            ),
+        )
+        .await
+        .unwrap();
+    let volume_state = volume.state;
+    let nexus = volume_state.target.unwrap();
+    tracing::info!("Published on '{}'", nexus.node);
+
+    let volume = client
+        .volumes_api()
+        .del_volume_target(&volume.spec.uuid, None, Some(cluster.csi_node(1).as_str()))
+        .await
+        .expect_err("delete target should fail");
+
+    let unpub_err = volume.error_body().unwrap();
+    tracing::info!("{:?}", unpub_err);
+    assert!(unpub_err.kind == RestJsonErrorKind::PermissionDenied);
+    assert!(unpub_err
+        .message
+        .contains("SvcError :: FrontendNodeNotAllowed"));
+
+    let vol = client.volumes_api().get_volume(&volume_uuid).await.unwrap();
+    assert!(!vol.state.target.unwrap().device_uri.is_empty());
 }
