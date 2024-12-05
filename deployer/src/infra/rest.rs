@@ -44,6 +44,10 @@ impl ComponentAction for Rest {
                 }
             }
 
+            if let Some(core_health_freq) = &options.rest_core_health_freq {
+                binary = binary.with_args(vec!["--core-health-freq", core_health_freq]);
+            }
+
             if cfg.container_exists("jaeger") {
                 let jaeger_config = format!("jaeger.{}:4317", cfg.get_name());
                 binary = binary.with_args(vec!["--jaeger", &jaeger_config])
