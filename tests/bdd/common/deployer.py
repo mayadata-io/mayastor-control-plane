@@ -38,6 +38,7 @@ class StartOptions:
     no_min_timeouts: bool = False
     rust_log: str = None
     rust_log_silence: str = None
+    rest_core_health_freq: str = None
 
     def args(self):
         args = [
@@ -99,6 +100,9 @@ class StartOptions:
             if rust_log_silence is not None:
                 args.append(f"--rust-log-silence={rust_log_silence}")
 
+        if self.rest_core_health_freq:
+            args.append(f"--rest-core-health-freq={self.rest_core_health_freq}")
+
         agent_arg = "--agents=Core"
         if self.ha_node_agent:
             agent_arg += ",HaNode"
@@ -106,6 +110,7 @@ class StartOptions:
             agent_arg += ",HaCluster"
             if self.ha_cluster_agent_fast is not None:
                 args.append(f"--cluster-fast-requeue={self.ha_cluster_agent_fast}")
+
         args.append(agent_arg)
 
         return args
@@ -139,6 +144,7 @@ class Deployer(object):
         no_min_timeouts=False,
         rust_log: str = None,
         rust_log_silence: str = None,
+        rest_core_health_freq: str = None,
     ):
         options = StartOptions(
             io_engines,
@@ -165,6 +171,7 @@ class Deployer(object):
             no_min_timeouts=no_min_timeouts,
             rust_log=rust_log,
             rust_log_silence=rust_log_silence,
+            rest_core_health_freq=rest_core_health_freq,
         )
         pytest.deployer_options = options
         Deployer.start_with_opts(options)
