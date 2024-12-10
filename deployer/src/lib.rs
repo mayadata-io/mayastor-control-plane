@@ -136,6 +136,10 @@ pub struct StartOptions {
     #[clap(long, conflicts_with = "no_rest")]
     pub rest_jwk: Option<String>,
 
+    /// Set the rest-to-core health probe frequency on the rest.
+    #[arg(long)]
+    pub rest_core_health_freq: Option<String>,
+
     /// Use the following image pull policy when creating containers from images.
     #[clap(long, default_value = "ifnotpresent")]
     pub image_pull_policy: composer::ImagePullPolicy,

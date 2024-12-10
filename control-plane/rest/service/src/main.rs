@@ -1,16 +1,25 @@
 mod authentication;
+mod health;
 mod v0;
 
-use crate::v0::{CORE_CLIENT, JSON_GRPC_CLIENT};
+use crate::{
+    health::{
+        core_state::CachedCoreState,
+        handlers::{liveness, readiness},
+    },
+    v0::{CORE_CLIENT, JSON_GRPC_CLIENT},
+};
 use actix_service::ServiceFactory;
 use actix_web::{
     body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
-    middleware, App, HttpServer,
+    middleware,
+    web::Data,
+    App, HttpServer,
 };
 use rustls::{Certificate, PrivateKey, ServerConfig};
 use rustls_pemfile::{certs, rsa_private_keys};
-use std::{fs::File, io::BufReader};
+use std::{fs::File, io::BufReader, time::Duration};
 use utils::DEFAULT_GRPC_CLIENT_ADDR;
 
 #[derive(Debug, Parser)]
@@ -27,6 +36,10 @@ pub(crate) struct CliArgs {
     /// The CORE gRPC Server URL or address to connect to the services.
     #[clap(long, short = 'z', default_value = DEFAULT_GRPC_CLIENT_ADDR)]
     core_grpc: Uri,
+
+    /// Set the frequency of probing the agent-core for a liveness check.
+    #[arg(long = "core-health-freq", value_parser = humantime::parse_duration, default_value = "2m")]
+    core_liveness_check_frequency: Duration,
 
     /// The json gRPC Server URL or address to connect to the service.
     #[clap(long, short = 'J')]
@@ -222,24 +235,30 @@ async fn main() -> anyhow::Result<()> {
         .with_tracing_tags(cli_args.tracing_tags.clone())
         .init("rest-server");
 
+    // Initialize the core client to be used in rest
+    CORE_CLIENT
+        .set(CoreClient::new(cli_args.core_grpc, timeout_opts()).await)
+        .ok()
+        .expect("Expect to be initialised only once");
+
+    let cached_core_state =
+        Data::new(CachedCoreState::new(cli_args.core_liveness_check_frequency).await);
+
     let app = move || {
         App::new()
+            .app_data(cached_core_state.clone())
+            .service(liveness)
+            .service(readiness)
             .wrap(RequestTracing::new())
             .wrap(middleware::Logger::default())
             .app_data(authentication::init(get_jwk_path()))
             .configure_api(&v0::configure_api)
     };
 
-    // Initialise the core client to be used in rest
-    CORE_CLIENT
-        .set(CoreClient::new(CliArgs::args().core_grpc, timeout_opts()).await)
-        .ok()
-        .expect("Expect to be initialised only once");
-
-    // Initialise the json grpc client to be used in rest
-    if CliArgs::args().json_grpc.is_some() {
+    // Initialize the json grpc client to be used in rest
+    if let Some(json_grpc) = CliArgs::args().json_grpc {
         JSON_GRPC_CLIENT
-            .set(JsonGrpcClient::new(CliArgs::args().json_grpc.unwrap(), timeout_opts()).await)
+            .set(JsonGrpcClient::new(json_grpc, timeout_opts()).await)
             .ok()
             .expect("Expect to be initialised only once");
     }

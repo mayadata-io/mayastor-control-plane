@@ -1,11 +1,10 @@
 import os
 import subprocess
+from dataclasses import dataclass
 from datetime import datetime
 
-import pytest
-from dataclasses import dataclass
-
 import common
+import pytest
 from common.docker import Docker
 from common.nvme import nvme_disconnect_allours_wait
 
@@ -36,6 +35,9 @@ class StartOptions:
     io_engine_devices: [str] = ()
     request_timeout: str = ""
     no_min_timeouts: bool = False
+    rust_log: str = None
+    rust_log_silence: str = None
+    rest_core_health_freq: str = None
 
     def args(self):
         args = [
@@ -84,6 +86,9 @@ class StartOptions:
         if self.no_min_timeouts:
             args.append(f"--no-min-timeouts")
 
+        if self.rest_core_health_freq:
+            args.append(f"--rest-core-health-freq={self.rest_core_health_freq}")
+
         agent_arg = "--agents=Core"
         if self.ha_node_agent:
             agent_arg += ",HaNode"
@@ -91,6 +96,7 @@ class StartOptions:
             agent_arg += ",HaCluster"
             if self.ha_cluster_agent_fast is not None:
                 args.append(f"--cluster-fast-requeue={self.ha_cluster_agent_fast}")
+
         args.append(agent_arg)
 
         return args
@@ -122,6 +128,9 @@ class Deployer(object):
         io_engine_devices=[],
         request_timeout="",
         no_min_timeouts=False,
+        rust_log: str = None,
+        rust_log_silence: str = None,
+        rest_core_health_freq: str = None,
     ):
         options = StartOptions(
             io_engines,
@@ -146,6 +155,9 @@ class Deployer(object):
             io_engine_devices=io_engine_devices,
             request_timeout=request_timeout,
             no_min_timeouts=no_min_timeouts,
+            rust_log=rust_log,
+            rust_log_silence=rust_log_silence,
+            rest_core_health_freq=rest_core_health_freq,
         )
         pytest.deployer_options = options
         Deployer.start_with_opts(options)
