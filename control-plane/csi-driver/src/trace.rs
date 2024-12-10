@@ -46,6 +46,6 @@ impl<'a> CsiRequest<'a> {
     }
     /// Log completion trace.
     pub fn trace_ok(self) {
-        tracing::info!("{}", self.log_str())
+        tracing::trace!("{}", self.log_str())
     }
 }
