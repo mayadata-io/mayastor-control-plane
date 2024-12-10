@@ -3,8 +3,7 @@ use rpc::csi::{controller_server::ControllerServer, identity_server::IdentitySer
 
 use std::{fs, io::ErrorKind, ops::Add};
 use tokio::net::UnixListener;
-use tonic::codegen::tokio_stream::wrappers::UnixListenerStream;
-use tonic::transport::Server;
+use tonic::{codegen::tokio_stream::wrappers::UnixListenerStream, transport::Server};
 use tracing::{debug, error, info};
 
 pub(super) struct CsiServer {}
