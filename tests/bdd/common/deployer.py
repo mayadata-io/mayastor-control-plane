@@ -16,6 +16,7 @@ class StartOptions:
     wait: str = "10s"
     csi_controller: bool = False
     csi_node: bool = False
+    csi_rest: bool = False
     reconcile_period: str = ""
     faulted_child_wait_period: str = ""
     cache_period: str = ""
@@ -51,6 +52,8 @@ class StartOptions:
             args.append("--csi-controller")
         if self.csi_node:
             args.append("--csi-node")
+        if self.csi_rest:
+            args.append("--csi-node-rest")
         if self.jaeger:
             args.append("--jaeger")
         if len(self.reconcile_period) > 0:
@@ -124,6 +127,7 @@ class Deployer(object):
         wait="10s",
         csi_controller=False,
         csi_node=False,
+        csi_rest=False,
         reconcile_period="",
         faulted_child_wait_period="",
         cache_period="",
@@ -151,6 +155,7 @@ class Deployer(object):
             wait,
             csi_controller=csi_controller,
             csi_node=csi_node,
+            csi_rest=csi_rest,
             reconcile_period=reconcile_period,
             faulted_child_wait_period=faulted_child_wait_period,
             cache_period=cache_period,

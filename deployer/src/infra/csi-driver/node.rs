@@ -42,6 +42,7 @@ impl ComponentAction for CsiNode {
                     i,
                     cfg,
                     options.enable_app_node_registration,
+                    options.csi_node_rest,
                     options.io_engine_cores,
                 )?;
             }
@@ -111,6 +112,7 @@ impl CsiNode {
         index: u32,
         cfg: Builder,
         enable_registration: bool,
+        enable_rest: bool,
         io_queues: u32,
     ) -> Result<Builder, Error> {
         let container_name = Self::container_name(index);
@@ -123,6 +125,7 @@ impl CsiNode {
             &socket,
             cfg,
             enable_registration,
+            enable_rest,
             io_queues,
         )
     }
@@ -137,6 +140,7 @@ impl CsiNode {
             &socket,
             cfg,
             options.enable_app_node_registration,
+            options.csi_node_rest,
             options.io_engine_cores,
         )
     }
@@ -145,7 +149,8 @@ impl CsiNode {
         node_name: &str,
         socket: &str,
         cfg: Builder,
-        enable_registation: bool,
+        enable_registration: bool,
+        enable_rest: bool,
         io_queues: u32,
     ) -> Result<Builder, Error> {
         let io_queues = io_queues.max(1);
@@ -156,11 +161,17 @@ impl CsiNode {
             // regardless of what its default value is.
             .with_args(vec!["--csi-socket", socket]);
 
-        binary = if enable_registation {
+        if enable_registration || enable_rest {
+            binary = binary.with_args(vec!["--rest-endpoint", "http://rest:8081"]);
+        }
+        if enable_rest {
+            binary = binary.with_args(vec!["--enable-rest"]);
+        }
+
+        binary = if enable_registration {
             let endpoint = format!("{}:50055", cfg.next_ip_for_name(container_name)?);
             binary
                 .with_args(vec!["--enable-registration"])
-                .with_args(vec!["--rest-endpoint", "http://rest:8081"])
                 .with_args(vec!["--grpc-endpoint", &endpoint])
         } else {
             binary.with_args(vec!["--grpc-endpoint", "[::]:50055"])
