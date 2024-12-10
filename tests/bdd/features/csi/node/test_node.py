@@ -106,7 +106,7 @@ def get_volume_capability(volume, read_only):
 
 @pytest.fixture(scope="module")
 def setup():
-    Deployer.start(1, csi_node=True)
+    Deployer.start(1, csi_node=True, csi_rest=True)
 
     # Create 2 pools.
     pool_labels = disk_pool_label
@@ -235,6 +235,13 @@ def test_restaging_a_volume():
 @scenario("node.feature", "stage volume request with unsupported fs_type")
 def test_stage_volume_request_with_unsupported_fs_type():
     """Stage volume request with unsupported fs_type."""
+
+
+@scenario(
+    "node.feature", "stage volume request with incorrect uri in the publish context"
+)
+def test_stage_volume_request_with_incorrect_uri_in_the_publish_context():
+    """stage volume request with incorrect uri in the publish context."""
 
 
 @scenario("node.feature", "stage volume request without specified access_mode")
@@ -624,6 +631,37 @@ def attempt_to_stage_volume_with_unsupported_fs_type(
     assert error.value.code() == grpc.StatusCode.INVALID_ARGUMENT
 
 
+@when("staging a volume with an incorrect uri")
+def _(
+    get_published_nexus, csi_instance, staging_target_path, io_timeout, staged_volumes
+):
+    nexus = get_published_nexus
+    volume = Volume(
+        nexus.uuid,
+        nexus.protocol,
+        nexus.uri,
+        "MULTI_NODE_SINGLE_WRITER",
+        staging_target_path,
+        "ext4",
+    )
+    csi_instance.node.NodeStageVolume(
+        pb.NodeStageVolumeRequest(
+            volume_id=nexus.uuid,
+            publish_context={"uri": "bad", "ioTimeout": io_timeout},
+            staging_target_path=staging_target_path,
+            volume_capability=pb.VolumeCapability(
+                access_mode=pb.VolumeCapability.AccessMode(
+                    mode=pb.VolumeCapability.AccessMode.Mode.MULTI_NODE_SINGLE_WRITER
+                ),
+                mount=pb.VolumeCapability.MountVolume(fs_type="ext4", mount_flags=[]),
+            ),
+            secrets={},
+            volume_context={},
+        )
+    )
+    staged_volumes[volume.uuid] = volume
+
+
 @when(parsers.parse('staging an "{fs_type}" volume as "{mode}"'))
 def stage_new_volume(
     get_published_nexus, stage_volume, staging_target_path, fs_type, mode
@@ -773,6 +811,12 @@ def _(generic_staged_volume):
     nvme_set_ctrl_loss_tmo(uri, 1)
     ApiClient.volumes_api().del_volume_target(generic_staged_volume.uuid)
     wait_nvme_gone_device(uri)
+
+
+@when("the rest client is enabled")
+def _():
+    """the rest client is enabled."""
+    pass
 
 
 @then("the volume should be stageable again")
