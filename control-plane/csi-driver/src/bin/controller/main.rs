@@ -111,12 +111,19 @@ async fn main() -> anyhow::Result<()> {
                 .help("Formatting style to be used while logging")
         )
         .arg(
-        Arg::new("ansi-colors")
-            .long("ansi-colors")
-            .default_value("true")
-            .value_parser(clap::value_parser!(bool))
-            .help("Enable ansi color for logs")
-    )
+            Arg::new("ansi-colors")
+                .long("ansi-colors")
+                .default_value("true")
+                .value_parser(clap::value_parser!(bool))
+                .help("Enable ansi color for logs")
+        )
+        .arg(
+            Arg::new("force-unstage-volume")
+                .long("force-unstage-volume")
+                .default_value("true")
+                .value_parser(clap::value_parser!(bool))
+                .help("Enable force unstage volume feature")
+        )
         .get_matches();
 
     utils::print_package_info!();
