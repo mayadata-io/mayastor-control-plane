@@ -123,6 +123,10 @@ pub struct StartOptions {
     #[clap(long)]
     pub csi_node: bool,
 
+    /// Enable the rest client in the csi-node plugin.
+    #[clap(long, requires = "csi_node")]
+    pub csi_node_rest: bool,
+
     /// Use `N` csi-node instances
     #[clap(long, requires = "csi_node")]
     pub app_nodes: Option<u32>,

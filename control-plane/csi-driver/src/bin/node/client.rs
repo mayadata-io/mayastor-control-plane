@@ -5,9 +5,15 @@ use stor_port::types::v0::openapi::{
     models::{RegisterAppNode, RestJsonError},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use stor_port::types::v0::openapi::apis::app_nodes_api::tower::client::direct::AppNodes;
+use stor_port::types::v0::openapi::{
+    apis::{
+        app_nodes_api::tower::client::direct::AppNodes,
+        volumes_api::tower::client::{direct::Volumes, VolumesClient},
+    },
+    models::NexusState,
+};
 use tonic::Status;
 use tracing::info;
 
@@ -92,9 +98,6 @@ impl From<clients::tower::Error<RestJsonError>> for ApiClientError {
     }
 }
 
-/// Default rest api timeout for requests.
-const DEFAULT_TIMEOUT_FOR_REST_REQUESTS: Duration = Duration::from_secs(5);
-
 /// Wrapper for AppNodes REST API client.
 pub(crate) struct AppNodesClientWrapper {
     client: AppNodesClient,
@@ -105,26 +108,24 @@ impl AppNodesClientWrapper {
     pub(crate) fn initialize(
         endpoint: Option<&String>,
     ) -> anyhow::Result<Option<AppNodesClientWrapper>> {
+        const REST_TIMEOUT: Duration = Duration::from_secs(5);
+
         let Some(endpoint) = endpoint else {
             return Ok(None);
         };
 
         let url = clients::tower::Url::parse(endpoint)
-            .map_err(|error| anyhow!("Invalid API endpoint URL {}: {:?}", endpoint, error))?;
+            .map_err(|error| anyhow!("Invalid API endpoint URL {endpoint}: {error:?}"))?;
 
         let tower = clients::tower::Configuration::builder()
-            .with_timeout(DEFAULT_TIMEOUT_FOR_REST_REQUESTS)
+            .with_timeout(REST_TIMEOUT)
             .build_url(url)
             .map_err(|error| {
-                anyhow::anyhow!(
-                    "Failed to create openapi configuration, Error: '{:?}'",
-                    error
-                )
+                anyhow::anyhow!("Failed to create openapi configuration, Error: '{error:?}'")
             })?;
 
         info!(
-            "API client is initialized with endpoint {}, request timeout = {:?}",
-            endpoint, DEFAULT_TIMEOUT_FOR_REST_REQUESTS,
+            "API client is initialized with endpoint {endpoint}, request timeout = {REST_TIMEOUT:?}"
         );
 
         Ok(Some(Self {
@@ -157,5 +158,59 @@ impl AppNodesClientWrapper {
         self.client.deregister_app_node(app_node_id).await?;
 
         Ok(())
+    }
+}
+
+/// Wrapper for Volumes REST API client.
+#[derive(Clone)]
+pub(crate) struct VolumesClientWrapper {
+    client: VolumesClient,
+}
+
+impl VolumesClientWrapper {
+    /// Initialize VolumesClientWrapper instance.
+    pub(crate) fn new(endpoint: &str) -> anyhow::Result<Self> {
+        /// TODO: what's the NodeStage timeout?
+        const REST_TIMEOUT: Duration = Duration::from_secs(10);
+
+        let url = clients::tower::Url::parse(endpoint)
+            .map_err(|error| anyhow!("Invalid API endpoint URL {endpoint}: {error:?}"))?;
+
+        let config = clients::tower::Configuration::builder()
+            .with_timeout(REST_TIMEOUT)
+            .with_concurrency_limit(Some(10))
+            .build_url(url)
+            .map_err(|error| {
+                anyhow::anyhow!("Failed to create openapi configuration, Error: '{error:?}'")
+            })?;
+
+        info!(
+            "VolumesClient API is initialized with endpoint {endpoint}, request timeout = {REST_TIMEOUT:?}"
+        );
+
+        Ok(Self {
+            client: VolumesClient::new(Arc::new(config)),
+        })
+    }
+
+    /// Get the target URI for the given volume.
+    pub(crate) async fn volume_uri(
+        &self,
+        volume_id: &uuid::Uuid,
+    ) -> Result<String, ApiClientError> {
+        let volume: stor_port::types::v0::openapi::models::Volume =
+            self.client.get_volume(volume_id).await?;
+        let Some(target) = volume.state.target else {
+            return Err(ApiClientError::Unavailable(
+                "Volume target is not available".into(),
+            ));
+        };
+        if !matches!(target.state, NexusState::Online | NexusState::Degraded) {
+            return Err(ApiClientError::Unavailable(
+                "Volume target is not ready for I/O".into(),
+            ));
+        }
+        // TODO: check for other volume statuses, example ONLINE?
+        Ok(target.device_uri)
     }
 }
