@@ -164,7 +164,7 @@ fn get_access_type(volume_capability: &Option<VolumeCapability>) -> Result<&Acce
 
 /// Detach the nexus device from the system, either at volume unstage,
 /// or after failed filesystem mount at volume stage.
-async fn detach(uuid: &Uuid, errheader: String) -> Result<(), Status> {
+pub(crate) async fn detach(uuid: &Uuid, errheader: String) -> Result<(), Status> {
     if let Some(device) = Device::lookup(uuid).await.map_err(|error| {
         failure!(
             Code::Internal,
