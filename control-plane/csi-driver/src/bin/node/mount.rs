@@ -1,6 +1,5 @@
 //! Utility functions for mounting and unmounting filesystems.
-use crate::filesystem_ops::FileSystem;
-use crate::runtime;
+use crate::{filesystem_ops::FileSystem, runtime};
 use csi_driver::filesystem::FileSystem as Fs;
 use devinfo::mountinfo::{MountInfo, SafeMountIter};
 

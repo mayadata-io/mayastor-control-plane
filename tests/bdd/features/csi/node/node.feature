@@ -29,6 +29,11 @@ Feature: CSI node plugin
     When staging a volume with a volume_capability with a mount with an unsupported fs_type
     Then the request should fail
 
+  Scenario: stage volume request with incorrect uri in the publish context
+    When staging a volume with an incorrect uri
+    But the rest client is enabled
+    Then the request should succeed
+
   Scenario: staging a single writer volume
     When staging an "ext4" volume as "MULTI_NODE_SINGLE_WRITER"
     Then the request should succeed

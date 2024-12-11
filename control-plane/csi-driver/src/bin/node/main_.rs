@@ -20,7 +20,7 @@ use grpc::csi_node_nvme::nvme_operations_server::NvmeOperationsServer;
 use stor_port::platform;
 use utils::tracing_telemetry::{FmtLayer, FmtStyle};
 
-use crate::client::AppNodesClientWrapper;
+use crate::client::{AppNodesClientWrapper, VolumesClientWrapper};
 use clap::Arg;
 use serde_json::json;
 use std::{
@@ -32,8 +32,7 @@ use std::{
     str::FromStr,
 };
 use tokio::net::UnixListener;
-use tonic::codegen::tokio_stream::wrappers::UnixListenerStream;
-use tonic::transport::Server;
+use tonic::{codegen::tokio_stream::wrappers::UnixListenerStream, transport::Server};
 use tracing::{debug, error, info};
 
 const GRPC_PORT: u16 = 50051;
@@ -57,6 +56,14 @@ pub(super) async fn main() -> anyhow::Result<()> {
                 .value_name("BOOLEAN")
                 .requires("rest-endpoint")
                 .help("Enable registration of the csi node with the control plane")
+        )
+        .arg(
+            Arg::new("enable-rest")
+                .long("enable-rest")
+                .action(clap::ArgAction::SetTrue)
+                .value_name("BOOLEAN")
+                .requires("rest-endpoint")
+                .help("Enhance csi with added rest functionality")
         )
         .arg(
             Arg::new("csi-socket")
@@ -322,10 +329,10 @@ pub(super) async fn main() -> anyhow::Result<()> {
         .unwrap_or("/var/tmp/csi.sock");
     // Remove stale CSI socket from previous instance if there is any.
     match fs::remove_file(csi_socket) {
-        Ok(_) => info!("Removed stale CSI socket {}", csi_socket),
+        Ok(_) => info!("Removed stale CSI socket {csi_socket}"),
         Err(err) => {
             if err.kind() != ErrorKind::NotFound {
-                anyhow::bail!("Error removing stale CSI socket {}: {}", csi_socket, err);
+                anyhow::bail!("Error removing stale CSI socket {csi_socket}: {err}");
             }
         }
     }
@@ -371,22 +378,35 @@ impl CsiServer {
 
         let incoming = {
             let uds = UnixListener::bind(csi_socket).unwrap();
-            info!("CSI plugin bound to {}", csi_socket);
+            info!("CSI plugin bound to {csi_socket}");
 
             // Change permissions on CSI socket to allow non-privileged clients to access it
             // to simplify testing.
-            if let Err(e) = fs::set_permissions(
+            if let Err(error) = fs::set_permissions(
                 csi_socket,
                 std::os::unix::fs::PermissionsExt::from_mode(0o777),
             ) {
-                error!("Failed to change permissions for CSI socket: {:?}", e);
+                error!("Failed to change permissions for CSI socket: {error:?}");
             } else {
                 debug!("Successfully changed file permissions for CSI socket");
             }
             UnixListenerStream::new(uds)
         };
 
-        let node = Node::new(node_name.into(), node_selector, probe_filesystems());
+        let vol_client = match cli_args.get_one::<String>("rest-endpoint") {
+            Some(ep) if cli_args.get_flag("enable-rest") => Some(VolumesClientWrapper::new(ep)?),
+            _ => {
+                tracing::warn!("The rest client is not enabled - functionality may be limited");
+                None
+            }
+        };
+
+        let node = Node::new(
+            node_name.into(),
+            node_selector,
+            probe_filesystems(),
+            vol_client,
+        );
         Ok(async move {
             Server::builder()
                 .add_service(NodeServer::new(node))
