@@ -395,7 +395,10 @@ impl CsiServer {
 
         let vol_client = match cli_args.get_one::<String>("rest-endpoint") {
             Some(ep) if cli_args.get_flag("enable-rest") => Some(VolumesClientWrapper::new(ep)?),
-            _ => None,
+            _ => {
+                tracing::warn!("The rest client is not enabled - functionality may be limited");
+                None
+            }
         };
 
         let node = Node::new(
