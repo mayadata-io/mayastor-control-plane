@@ -20,14 +20,14 @@ repos:
     -   id: rust-lint
         name: Rust lint
         description: Run cargo clippy on files included in the commit. clippy should be installed before-hand.
-        entry: nix-shell --pure --run 'cargo-clippy --all --all-targets -- -D warnings'
+        entry: nix-shell --pure --run './scripts/rust/linter.sh clippy'
         pass_filenames: false
         types: [file, rust]
         language: system
     -   id: rust-style
         name: Rust style
         description: Run cargo fmt on files included in the commit. rustfmt should be installed before-hand.
-        entry: nix-shell --pure --run 'cargo-fmt --all -- --check'
+        entry: nix-shell --pure --run './scripts/rust/linter.sh fmt'
         exclude: openapi/
         pass_filenames: false
         types: [file, rust]

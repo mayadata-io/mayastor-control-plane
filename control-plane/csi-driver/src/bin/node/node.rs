@@ -1,5 +1,6 @@
 use crate::{
     block_vol::{publish_block_volume, unpublish_block_volume},
+    client::VolumesClientWrapper,
     dev::{sysfs_dev_size, Device},
     filesystem_ops::FileSystem,
     filesystem_vol::{publish_fs_volume, stage_fs_volume, unpublish_fs_volume, unstage_fs_volume},
@@ -35,11 +36,12 @@ macro_rules! failure {
 }
 
 /// The Csi Node implementation.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct Node {
     node_name: String,
     node_selector: HashMap<String, String>,
     filesystems: Vec<FileSystem>,
+    vol_client: Option<VolumesClientWrapper>,
 }
 
 impl Node {
@@ -48,11 +50,13 @@ impl Node {
         node_name: String,
         node_selector: HashMap<String, String>,
         filesystems: Vec<FileSystem>,
+        vol_client: Option<VolumesClientWrapper>,
     ) -> Node {
         let self_ = Self {
             node_name,
             node_selector,
             filesystems,
+            vol_client,
         };
         info!("Node topology segments: {:?}", self_.segments());
         self_
@@ -71,6 +75,32 @@ impl Node {
             .into_iter()
             .chain(vec![self.node_name_segment()])
             .collect()
+    }
+
+    /// Get the target URI for the given volume.
+    /// If the REST volume client is enabled, use it to fetch the volume and its target URI.
+    /// Otherwise, use the publish context.
+    async fn volume_uri(
+        &self,
+        volume_id: &Uuid,
+        context: &HashMap<String, String>,
+    ) -> Result<String, tonic::Status> {
+        let ctx_uri = context.get("uri").ok_or_else(|| {
+            failure!(
+                Code::InvalidArgument,
+                "Failed to stage volume {volume_id}: URI attribute missing from publish context"
+            )
+        })?;
+
+        let Some(client) = &self.vol_client else {
+            return Ok(ctx_uri.to_string());
+        };
+
+        let uri = client.volume_uri(volume_id).await?;
+        if &uri != ctx_uri {
+            tracing::warn!(volume.uri=%uri, ctx.uri=%ctx_uri, "Overriding URI volume context with URI from REST");
+        }
+        Ok(uri)
     }
 }
 
@@ -662,14 +692,6 @@ impl node_server::Node for Node {
             }
         };
 
-        let uri = msg.publish_context.get("uri").ok_or_else(|| {
-            failure!(
-                Code::InvalidArgument,
-                "Failed to stage volume {}: URI attribute missing from publish context",
-                &msg.volume_id
-            )
-        })?;
-
         let uuid = Uuid::parse_str(&msg.volume_id).map_err(|error| {
             failure!(
                 Code::Internal,
@@ -680,13 +702,21 @@ impl node_server::Node for Node {
         })?;
         let _guard = VolumeOpGuard::new(uuid)?;
 
+        // We cannot fully rely on the URI stored in the `publish_context` because it may change
+        // if the target gets moved to another node.
+        // It's possible that a pod gets restaged on the same node, and thus skipping the controller
+        // publish call, leaving us with a bad URI:
+        // https://github.com/openebs/mayastor/issues/1781
+        // In order to fix this issue we need to fetch the volume uri from the control-plane.
+        let uri = self.volume_uri(&uuid, &msg.publish_context).await?;
+
         // Note checking existence of staging_target_path, is delegated to
         // code handling those volume types where it is relevant.
 
         // All checks complete, now attach, if not attached already.
         debug!("Volume {} has URI {}", &msg.volume_id, uri);
 
-        let mut device = Device::parse(uri).map_err(|error| {
+        let mut device = Device::parse(&uri).map_err(|error| {
             failure!(
                 Code::Internal,
                 "Failed to stage volume {}: error parsing URI {}: {}",
