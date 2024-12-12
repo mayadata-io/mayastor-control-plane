@@ -4,21 +4,24 @@ use crate::{
 };
 use csi_driver::{
     context::{CreateParams, CreateSnapshotParams, PublishParams, QuiesceFsCandidate},
-    node::internal::{node_plugin_client::NodePluginClient, FreezeFsRequest, UnfreezeFsRequest},
+    node::internal::{
+        node_plugin_client::NodePluginClient, ForceUnstageVolumeRequest, FreezeFsRequest,
+        UnfreezeFsRequest,
+    },
 };
 use rpc::csi::{volume_content_source::Type, Topology as CsiTopology, *};
 use stor_port::types::v0::openapi::{
     models,
     models::{
-        AffinityGroup, LabelledTopology, NodeSpec, NodeStatus, Pool, PoolStatus, PoolTopology,
-        SpecStatus, Volume, VolumeShareProtocol,
+        AffinityGroup, AppNode, LabelledTopology, NodeSpec, NodeStatus, Pool, PoolStatus,
+        PoolTopology, SpecStatus, Volume, VolumeShareProtocol,
     },
 };
-use utils::{dsp_created_by_key, DSP_OPERATOR};
+use utils::{dsp_created_by_key, DEFAULT_REQ_TIMEOUT, DSP_OPERATOR};
 
 use regex::Regex;
-use std::{collections::HashMap, str::FromStr};
-use tonic::{Code, Request, Response, Status};
+use std::{collections::HashMap, str::FromStr, time::Duration};
+use tonic::{transport::Uri, Code, Request, Response, Status};
 use tracing::{debug, error, instrument, trace, warn};
 use uuid::Uuid;
 use volume_capability::AccessType;
@@ -31,6 +34,7 @@ const SNAPSHOT_NAME_PATTERN: &str =
 #[derive(Debug)]
 pub(crate) struct CsiControllerSvc {
     create_volume_limiter: std::sync::Arc<tokio::sync::Semaphore>,
+    force_unstage_volume: bool,
 }
 impl CsiControllerSvc {
     pub(crate) fn new(cfg: &CsiControllerConfig) -> Self {
@@ -38,6 +42,7 @@ impl CsiControllerSvc {
             create_volume_limiter: std::sync::Arc::new(tokio::sync::Semaphore::new(
                 cfg.create_volume_limit(),
             )),
+            force_unstage_volume: cfg.force_unstage_volume(),
         }
     }
     async fn create_volume_permit(&self) -> Result<tokio::sync::SemaphorePermit, tonic::Status> {
@@ -91,12 +96,30 @@ fn volume_app_node(volume: &Volume) -> Option<String> {
     }
 }
 
-#[tracing::instrument]
+/// Create a new endpoint that connects to the provided Uri.
+/// This endpoint has default connect and request timeouts.
+fn tonic_endpoint(endpoint: String) -> Result<tonic::transport::Endpoint, Status> {
+    let uri =
+        Uri::try_from(endpoint).map_err(|error| Status::invalid_argument(error.to_string()))?;
+
+    let timeout = humantime::parse_duration(DEFAULT_REQ_TIMEOUT).unwrap();
+    Ok(tonic::transport::Endpoint::from(uri)
+        .connect_timeout(timeout)
+        .timeout(std::time::Duration::from_secs(30))
+        .http2_keep_alive_interval(Duration::from_secs(5))
+        .keep_alive_timeout(Duration::from_secs(10))
+        .concurrency_limit(utils::DEFAULT_GRPC_CLIENT_CONCURRENCY))
+}
+
+#[tracing::instrument(err, skip_all)]
 async fn issue_fs_freeze(endpoint: String, volume_id: String) -> Result<(), Status> {
     trace!("Issuing fs freeze");
-    let mut client = NodePluginClient::connect(format!("http://{endpoint}"))
+    let channel = tonic_endpoint(format!("http://{endpoint}"))?
+        .connect()
         .await
-        .map_err(|error| Status::failed_precondition(error.to_string()))?;
+        .map_err(|error| Status::unavailable(error.to_string()))?;
+    let mut client = NodePluginClient::new(channel);
+
     match client
         .freeze_fs(Request::new(FreezeFsRequest {
             volume_id: volume_id.clone(),
@@ -112,12 +135,15 @@ async fn issue_fs_freeze(endpoint: String, volume_id: String) -> Result<(), Stat
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(err, skip_all)]
 async fn issue_fs_unfreeze(endpoint: String, volume_id: String) -> Result<(), Status> {
     trace!("Issuing fs unfreeze");
-    let mut client = NodePluginClient::connect(format!("http://{endpoint}"))
+    let channel = tonic_endpoint(format!("http://{endpoint}"))?
+        .connect()
         .await
-        .map_err(|error| Status::failed_precondition(error.to_string()))?;
+        .map_err(|error| Status::unavailable(error.to_string()))?;
+    let mut client = NodePluginClient::new(channel);
+
     match client
         .unfreeze_fs(Request::new(UnfreezeFsRequest {
             volume_id: volume_id.clone(),
@@ -131,6 +157,28 @@ async fn issue_fs_unfreeze(endpoint: String, volume_id: String) -> Result<(), St
         }
         Err(error) => Err(error),
     }
+}
+
+#[tracing::instrument(err, skip_all)]
+async fn force_unstage(app_node: AppNode, volume_id: String) -> Result<(), Status> {
+    tracing::info!(
+        "Issuing cleanup for volume: {} to node {}, to endpoint {}",
+        volume_id,
+        app_node.id,
+        app_node.spec.endpoint
+    );
+    let channel = tonic_endpoint(format!("http://{}", app_node.spec.endpoint))?
+        .connect()
+        .await
+        .map_err(|error| Status::unavailable(error.to_string()))?;
+    let mut client = NodePluginClient::new(channel);
+
+    client
+        .force_unstage_volume(Request::new(ForceUnstageVolumeRequest {
+            volume_id: volume_id.clone(),
+        }))
+        .await
+        .map(|_| ())
 }
 
 /// Get share URI for existing volume object and the node where the volume is published.
@@ -518,13 +566,12 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
                         error!("{}", m);
                         return Err(Status::internal(m));
                     }
-                },
+                }
                 _ => {
-
                     // Check for node being cordoned.
                     fn cordon_check(spec: Option<&NodeSpec>) -> bool {
                         if let Some(spec) = spec {
-                            return spec.cordondrainstate.is_some()
+                            return spec.cordondrainstate.is_some();
                         }
                         false
                     }
@@ -538,12 +585,18 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
                         // then let the control-plane decide where to place the target. Node should not be cordoned.
                         Ok(node) if node.state.as_ref().map(|n| n.status).unwrap_or(NodeStatus::Unknown) != NodeStatus::Online || cordon_check(node.spec.as_ref()) => {
                             Ok(None)
-                        },
+                        }
                         // For 1-replica volumes, don't pre-select the target node. This will allow the
                         // control-plane to pin the target to the replica node.
                         Ok(_) if volume.spec.num_replicas == 1 => Ok(None),
                         Ok(_) => Ok(Some(node_id.as_str())),
                     }?;
+
+                    // Issue a cleanup rpc to csi node to ensure the subsystem doesn't have any path present before publishing
+                    if self.force_unstage_volume {
+                        let app_node = RestApiClient::get_client().get_app_node(&args.node_id).await?;
+                        force_unstage(app_node, volume_id.to_string()).await?;
+                    }
 
                     // Volume is not published.
                     let v = RestApiClient::get_client()

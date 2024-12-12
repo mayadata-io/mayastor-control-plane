@@ -20,6 +20,8 @@ service NodePlugin {
   rpc UnfreezeFS (UnfreezeFSRequest) returns (UnfreezeFSReply) {}
   // Find the volume identified by the volume ID, and return volume information.
   rpc FindVolume (FindVolumeRequest) returns (FindVolumeReply) {}
+  // Force unstage the volume.
+  rpc ForceUnstageVolume (ForceUnstageVolumeRequest) returns (ForceUnstageVolumeReply) {}
 }
 
 enum VolumeType {
@@ -53,4 +55,12 @@ message FindVolumeRequest {
 message FindVolumeReply {
   optional VolumeType volume_type = 1;
   string device_path = 2; // the device path for the volume
+}
+
+// The request message containing ID of the volume to be force unstaged.
+message ForceUnstageVolumeRequest {
+  string volume_id = 1;
+}
+// Message for response on volume force unstage.
+message ForceUnstageVolumeReply {
 }

@@ -1,10 +1,11 @@
 //! Utility functions for mounting and unmounting filesystems.
-use crate::{filesystem_ops::FileSystem, runtime};
+use crate::{filesystem_ops::FileSystem, findmnt::DeviceMount, runtime};
 use csi_driver::filesystem::FileSystem as Fs;
 use devinfo::mountinfo::{MountInfo, SafeMountIter};
 
 use std::{collections::HashSet, io::Error};
 use sys_mount::{unmount, FilesystemType, Mount, MountFlags, UnmountFlags};
+use tonic::Status;
 use tracing::{debug, info};
 use uuid::Uuid;
 
@@ -424,4 +425,27 @@ pub(crate) async fn unmount_on_fs_id_diff(
             "Failed to unmount on fs id difference, device {device_path} from {fs_staging_path} for {volume_uuid}, {error}",
         )
     })
+}
+
+pub(crate) async fn lazy_unmount_mountpaths(mountpaths: &Vec<DeviceMount>) -> Result<(), Status> {
+    for mountpath in mountpaths {
+        debug!(
+            "Unmounting path: {}, with DETACH flag",
+            mountpath.mount_path()
+        );
+        let target_path = mountpath.mount_path().to_string();
+
+        runtime::spawn_blocking({
+            let target_path = target_path.clone();
+            move || {
+                let mut unmount_flags = UnmountFlags::empty();
+                unmount_flags.insert(UnmountFlags::DETACH);
+                sys_mount::unmount(target_path, unmount_flags)
+                    .map_err(|error| Status::aborted(error.to_string()))
+            }
+        })
+        .await
+        .map_err(|error| Status::aborted(error.to_string()))??;
+    }
+    Ok(())
 }
