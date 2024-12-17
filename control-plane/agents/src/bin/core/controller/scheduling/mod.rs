@@ -168,6 +168,21 @@ impl ChildSorters {
         match Self::sort_by_health(a, b) {
             Ordering::Equal => match Self::sort_by_child(a, b) {
                 Ordering::Equal => {
+                    // remove mismatched topology replicas first
+                    if let (Some(a), Some(b)) = (a.valid_node_topology(), b.valid_node_topology()) {
+                        match a.cmp(b) {
+                            Ordering::Equal => {}
+                            // todo: what if the pool and node topology are at odds with each other?
+                            _else => return _else,
+                        }
+                    }
+                    if let (Some(a), Some(b)) = (a.valid_pool_topology(), b.valid_pool_topology()) {
+                        match a.cmp(b) {
+                            Ordering::Equal => {}
+                            _else => return _else,
+                        }
+                    }
+
                     let childa_is_local = !a.spec().share.shared();
                     let childb_is_local = !b.spec().share.shared();
                     if childa_is_local == childb_is_local {
