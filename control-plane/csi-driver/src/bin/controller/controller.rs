@@ -602,18 +602,17 @@ impl rpc::csi::controller_server::Controller for CsiControllerSvc {
         }
 
         // Do forced volume unpublish as Kubernetes already detached the volume.
-        RestApiClient::get_client()
+        if let Err(error) = RestApiClient::get_client()
             .unpublish_volume(&volume_uuid, true, Some(args.node_id.as_str()))
             .await
-            .map_err(|e| match e {
-                ApiClientError::NotAcceptable(_) => {
-                    Status::ok("Ignoring failure on unpublish due to mismatched host")
-                }
-                _ => Status::not_found(format!(
-                    "Failed to unpublish volume {}, error = {:?}",
-                    &args.volume_id, e
-                )),
-            })?;
+        {
+            if !matches!(error, ApiClientError::NotAcceptable(_)) {
+                return Err(Status::not_found(format!(
+                    "Failed to unpublish volume {}, error = {error:?}",
+                    &args.volume_id
+                )));
+            }
+        }
 
         req.info_ok();
         Ok(Response::new(ControllerUnpublishVolumeResponse {}))
