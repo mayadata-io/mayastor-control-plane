@@ -81,6 +81,9 @@ async fn store_lease_lock() {
         .await
         .unwrap();
 
+    // Not sure why this is needed, perhaps our etcd wait check is flawed
+    // todo: fix the deployer wait check for etcd
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     let lease_ttl = std::time::Duration::from_secs(2);
     let _core_agent = Etcd::new_leased(
         ["0.0.0.0:2379"],

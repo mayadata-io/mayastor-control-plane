@@ -40,9 +40,9 @@ mkShell {
     pre-commit
     python3
     utillinux
-    rdma-core
     which
     paperclip
+    pytest_inputs
   ] ++ pkgs.lib.optional (!norust) rust
   ++ pkgs.lib.optionals (system != "aarch64-darwin") [
     e2fsprogs
@@ -50,10 +50,10 @@ mkShell {
     btrfs-progs
     nvme-cli
     # python3.9-pyopenssl-22.0.0 marked as broken but fixed on master..
-    pytest_inputs
     tini
     udev
     lvm2
+    rdma-core
   ] ++ pkgs.lib.optional (system == "aarch64-darwin") darwin.apple_sdk.frameworks.Security;
 
   LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
