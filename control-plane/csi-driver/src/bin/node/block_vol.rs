@@ -55,7 +55,7 @@ pub(crate) async fn publish_block_volume(msg: &NodePublishVolumeRequest) -> Resu
             //target exists and is a special file
 
             // Idempotency, if we have done this already just return success.
-            match findmnt::get_devicepath(target_path) {
+            match findmnt::get_devicepath(target_path).await {
                 Ok(findmnt_dev) => {
                     if let Some(fm_devpath) = findmnt_dev {
                         if fm_devpath == device_path {

@@ -185,6 +185,12 @@ pub(super) async fn main() -> anyhow::Result<()> {
                     even though volume target is rdma capable."
             )
         )
+        .arg(
+            Arg::new("kubelet-path")
+                .long("kubelet-path")
+                .default_value("/var/lib/kubelet")
+                .help("Kubelet path on the host system")
+        )
         .subcommand(
             clap::Command::new("fs-freeze")
                 .arg(
@@ -346,12 +352,14 @@ pub(super) async fn main() -> anyhow::Result<()> {
     // Parse instance and grpc endpoints from the command line arguments and validate.
     let grpc_sock_addr = validate_endpoints(&matches, registration_enabled)?;
 
+    let kubelet_path = matches.get_one::<String>("kubelet-path").unwrap();
+
     // Start the CSI server, node plugin grpc server and registration loop if registration is
     // enabled.
     *crate::config::config().nvme_as_mut() = TryFrom::try_from(&matches)?;
     let (csi, grpc, registration) = tokio::join!(
         CsiServer::run(csi_socket, &matches)?,
-        NodePluginGrpcServer::run(grpc_sock_addr),
+        NodePluginGrpcServer::run(grpc_sock_addr, kubelet_path.to_owned()),
         run_registration_loop(
             node_name.clone(),
             grpc_sock_addr.to_string(),

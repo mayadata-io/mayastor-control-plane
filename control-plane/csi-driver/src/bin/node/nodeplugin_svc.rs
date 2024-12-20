@@ -38,6 +38,7 @@ pub(crate) async fn find_mount(
 ) -> Result<Option<TypeOfMount>, tonic::Status> {
     let device_path = device.devname();
     let mountpaths = findmnt::get_mountpaths(&device_path)
+        .await
         .map_err(|error| tonic::Status::internal(error.to_string()))?;
     debug!(
         volume.uuid = volume_id,
