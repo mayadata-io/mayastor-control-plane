@@ -15,6 +15,8 @@ pub(crate) struct CsiControllerConfig {
     node_selector: HashMap<String, String>,
     /// Max Outstanding Create Volume Requests.
     create_volume_limit: usize,
+    /// Force unstage volume.
+    force_unstage_volume: bool,
 }
 
 impl CsiControllerConfig {
@@ -43,11 +45,19 @@ impl CsiControllerConfig {
                 .map(|s| s.map(|s| s.as_str())),
         )?;
 
+        let force_unstage_volume = args.get_flag("force-unstage-volume");
+        if !force_unstage_volume {
+            tracing::warn!(
+                "Force unstage volume is disabled, can trigger potential data corruption!"
+            );
+        }
+
         CONFIG.get_or_init(|| Self {
             rest_endpoint: rest_endpoint.into(),
             io_timeout: io_timeout.into(),
             node_selector,
             create_volume_limit,
+            force_unstage_volume,
         });
         Ok(())
     }
@@ -77,5 +87,9 @@ impl CsiControllerConfig {
     /// Get the node selector label segment.
     pub(crate) fn node_selector_segment(&self) -> HashMap<String, String> {
         self.node_selector.clone()
+    }
+    /// Force unstage volume.
+    pub(crate) fn force_unstage_volume(&self) -> bool {
+        self.force_unstage_volume
     }
 }

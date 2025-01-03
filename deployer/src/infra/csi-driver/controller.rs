@@ -30,7 +30,9 @@ impl ComponentAction for CsiController {
                 .with_args(vec!["--rest-endpoint", "http://rest:8081"])
                 // Make sure that CSI socket is always under shared directory
                 // regardless of what its default value is.
-                .with_args(vec!["--csi-socket", CSI_SOCKET]);
+                .with_args(vec!["--csi-socket", CSI_SOCKET])
+                // Disable force unstage volume. TODO: remove the flag and fix test.
+                .with_args(vec!["--force-unstage-volume", "false"]);
 
             if cfg.container_exists("jaeger") {
                 let jaeger_config = format!("jaeger.{}", cfg.get_name());
