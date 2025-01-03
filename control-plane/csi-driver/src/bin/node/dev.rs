@@ -27,6 +27,7 @@
 //!     }
 //! ```
 
+use nvmeadm::nvmf_discovery::TrType;
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -50,6 +51,21 @@ use crate::match_dev;
 
 pub(crate) type DeviceName = String;
 
+// Could've directly used NvmfAttach object but it contains an AtomicBool that
+// doesn't have Clone implemented.
+#[derive(Default)]
+pub struct NvmfAttachParameters {
+    _host: String,
+    _port: u16,
+    pub transport: TrType,
+}
+
+pub enum AttachParameters {
+    Nbd,
+    Iscsi,
+    Nvmf(NvmfAttachParameters),
+}
+
 #[tonic::async_trait]
 pub(crate) trait Attach: Sync + Send {
     async fn parse_parameters(
@@ -60,6 +76,9 @@ pub(crate) trait Attach: Sync + Send {
     async fn find(&self) -> Result<Option<DeviceName>, DeviceError>;
     /// Fixup parameters which cannot be set during attach, eg IO timeout
     async fn fixup(&self) -> Result<(), DeviceError>;
+    /// Get basic connections parameters like target address, transport and port,
+    /// for this attach object.
+    fn attach_parameters(&self) -> AttachParameters;
 }
 
 #[tonic::async_trait]

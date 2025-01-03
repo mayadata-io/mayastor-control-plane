@@ -2,7 +2,7 @@ use std::{collections::HashMap, convert::TryFrom};
 
 use url::Url;
 
-use super::{Attach, DeviceError, DeviceName};
+use super::{Attach, AttachParameters, DeviceError, DeviceName};
 
 pub(super) struct Nbd {
     path: String,
@@ -50,5 +50,9 @@ impl Attach for Nbd {
 
     async fn fixup(&self) -> Result<(), DeviceError> {
         Ok(())
+    }
+
+    fn attach_parameters(&self) -> AttachParameters {
+        AttachParameters::Nbd
     }
 }

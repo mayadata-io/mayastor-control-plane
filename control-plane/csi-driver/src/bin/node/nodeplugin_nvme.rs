@@ -1,4 +1,4 @@
-use crate::dev::{nvmf::volume_uuid_from_url_str, Device};
+use crate::dev::{nvmf::volume_uuid_from_url_str, AttachParameters, Device};
 use csi_driver::limiter::VolumeOpGuard;
 use grpc::csi_node_nvme::{
     nvme_operations_server::NvmeOperations, NvmeConnectRequest, NvmeConnectResponse,
@@ -42,6 +42,16 @@ impl NvmeOperations for NvmeOperationsSvc {
             .await
             .map_err(|error| warn!(error=%error, "Failed to do fixup after connect"));
 
-        Ok(tonic::Response::new(NvmeConnectResponse {}))
+        let conn_params = match device.attach_parameters() {
+            AttachParameters::Nvmf(p) => p,
+            // Must not reach here.
+            _ => {
+                unreachable!("Params must be of variant AttachParameters::Nvmf here.");
+            }
+        };
+
+        Ok(tonic::Response::new(NvmeConnectResponse {
+            transport_used: Some(conn_params.transport as i32),
+        }))
     }
 }

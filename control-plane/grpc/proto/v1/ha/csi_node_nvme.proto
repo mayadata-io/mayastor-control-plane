@@ -10,8 +10,16 @@ message NvmeConnectRequest {
   common.MapWrapper publish_context = 2;
 }
 
-message NvmeConnectResponse {
+// chosen enum variant values to match these values as TrType in nvmeadm.
+enum TrType {
+  Invalid = 0;
+  Rdma = 1;
+  Fc = 2;
+  Tcp = 3;
+}
 
+message NvmeConnectResponse {
+  optional TrType transport_used = 1;
 }
 
 service NvmeOperations {

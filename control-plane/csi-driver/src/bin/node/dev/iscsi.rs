@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{dev::util::extract_uuid, match_dev::match_iscsi_device};
 
-use super::{Attach, Detach, DeviceError, DeviceName};
+use super::{Attach, AttachParameters, Detach, DeviceError, DeviceName};
 
 mod iscsiadm;
 use iscsiadm::IscsiAdmin;
@@ -169,6 +169,10 @@ impl Attach for IscsiAttach {
 
     async fn fixup(&self) -> Result<(), DeviceError> {
         Ok(())
+    }
+
+    fn attach_parameters(&self) -> AttachParameters {
+        AttachParameters::Iscsi
     }
 }
 
