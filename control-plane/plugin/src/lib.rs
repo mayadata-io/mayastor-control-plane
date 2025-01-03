@@ -4,7 +4,7 @@ extern crate prettytable;
 extern crate lazy_static;
 
 use operations::{Label, SetProperty};
-use resources::LabelResources;
+use resources::{error::OutputFormatAbsentSnafu, utils::OutputFormat, LabelResources};
 use std::fmt::Debug;
 use utils::tracing_telemetry::{FmtLayer, FmtStyle};
 
@@ -43,14 +43,18 @@ impl Drop for TracingFlusher {
 pub trait ExecuteOperation {
     type Args;
     type Error;
-    async fn execute(&self, cli_args: &Self::Args) -> Result<(), Self::Error>;
+    async fn execute(
+        &self,
+        cli_args: impl clap::Parser,
+        output: Option<&OutputFormat>,
+    ) -> Result<(), Self::Error>;
 }
 
-#[derive(clap::Parser, Debug)]
+#[derive(Clone, clap::Parser, Debug)]
 pub struct CliArgs {
     /// The Output, viz yaml, json.
-    #[clap(global = true, default_value = resources::utils::OutputFormat::None.as_ref(), short, long)]
-    pub output: resources::utils::OutputFormat,
+    #[clap(global = true, default_value = OutputFormat::None.as_ref(), short, long)]
+    pub output: OutputFormat,
 
     /// Trace rest requests to the Jaeger endpoint agent.
     #[clap(global = true, long, short)]
@@ -93,15 +97,19 @@ impl CliArgs {
 impl ExecuteOperation for Operations {
     type Args = CliArgs;
     type Error = crate::resources::Error;
-    async fn execute(&self, cli_args: &CliArgs) -> PluginResult {
+    async fn execute(
+        &self,
+        cli_args: impl clap::Parser,
+        output: Option<&OutputFormat>,
+    ) -> PluginResult {
         match self {
-            Operations::Drain(resource) => resource.execute(cli_args).await,
-            Operations::Get(resource) => resource.execute(cli_args).await,
-            Operations::Scale(resource) => resource.execute(cli_args).await,
-            Operations::Set(resource) => resource.execute(cli_args).await,
-            Operations::Cordon(resource) => resource.execute(cli_args).await,
-            Operations::Uncordon(resource) => resource.execute(cli_args).await,
-            Operations::Label(resource) => resource.execute(cli_args).await,
+            Operations::Drain(resource) => resource.execute(cli_args, output).await,
+            Operations::Get(resource) => resource.execute(cli_args, output).await,
+            Operations::Scale(resource) => resource.execute(cli_args, output).await,
+            Operations::Set(resource) => resource.execute(cli_args, output).await,
+            Operations::Cordon(resource) => resource.execute(cli_args, output).await,
+            Operations::Uncordon(resource) => resource.execute(cli_args, output).await,
+            Operations::Label(resource) => resource.execute(cli_args, output).await,
         }
     }
 }
@@ -110,14 +118,19 @@ impl ExecuteOperation for Operations {
 impl ExecuteOperation for DrainResources {
     type Args = CliArgs;
     type Error = crate::resources::Error;
-    async fn execute(&self, cli_args: &CliArgs) -> PluginResult {
+    async fn execute(
+        &self,
+        _cli_args: impl clap::Parser,
+        output: Option<&OutputFormat>,
+    ) -> PluginResult {
+        let output = output.ok_or(OutputFormatAbsentSnafu.build())?;
         match self {
             DrainResources::Node(drain_node_args) => {
                 node::Node::drain(
                     &drain_node_args.node_id(),
                     drain_node_args.label(),
                     drain_node_args.drain_timeout(),
-                    &cli_args.output,
+                    output,
                 )
                 .await
             }
@@ -129,54 +142,47 @@ impl ExecuteOperation for DrainResources {
 impl ExecuteOperation for GetResources {
     type Args = CliArgs;
     type Error = crate::resources::Error;
-    async fn execute(&self, cli_args: &CliArgs) -> PluginResult {
+    async fn execute(
+        &self,
+        _cli_args: impl clap::Parser,
+        output: Option<&OutputFormat>,
+    ) -> PluginResult {
+        let output = output.ok_or(OutputFormatAbsentSnafu.build())?;
         match self {
             GetResources::Cordon(get_cordon_resource) => match get_cordon_resource {
                 GetCordonArgs::Node { id: node_id } => {
-                    cordon::NodeCordon::get(node_id, &cli_args.output).await
+                    cordon::NodeCordon::get(node_id, output).await
                 }
-                GetCordonArgs::Nodes => cordon::NodeCordons::list(&cli_args.output).await,
+                GetCordonArgs::Nodes => cordon::NodeCordons::list(output).await,
             },
             GetResources::Drain(get_drain_resource) => match get_drain_resource {
-                GetDrainArgs::Node { id: node_id } => {
-                    drain::NodeDrain::get(node_id, &cli_args.output).await
-                }
-                GetDrainArgs::Nodes => drain::NodeDrains::list(&cli_args.output).await,
+                GetDrainArgs::Node { id: node_id } => drain::NodeDrain::get(node_id, output).await,
+                GetDrainArgs::Nodes => drain::NodeDrains::list(output).await,
             },
-            GetResources::Volumes(vol_args) => {
-                volume::Volumes::list(&cli_args.output, vol_args).await
-            }
-            GetResources::Volume { id } => volume::Volume::get(id, &cli_args.output).await,
+            GetResources::Volumes(vol_args) => volume::Volumes::list(output, vol_args).await,
+            GetResources::Volume { id } => volume::Volume::get(id, output).await,
             GetResources::RebuildHistory { id } => {
-                volume::Volume::rebuild_history(id, &cli_args.output).await
+                volume::Volume::rebuild_history(id, output).await
             }
             GetResources::VolumeReplicaTopologies(vol_args) => {
-                volume::Volume::topologies(&cli_args.output, vol_args).await
+                volume::Volume::topologies(output, vol_args).await
             }
             GetResources::VolumeReplicaTopology { id } => {
-                volume::Volume::topology(id, &cli_args.output).await
+                volume::Volume::topology(id, output).await
             }
-            GetResources::Pools(args) => pool::Pools::list(args, &cli_args.output).await,
-            GetResources::Pool(args) => {
-                pool::Pool::get(&args.pool_id(), args, &cli_args.output).await
-            }
-            GetResources::Nodes(args) => node::Nodes::list(args, &cli_args.output).await,
-            GetResources::Node(args) => {
-                node::Node::get(&args.node_id(), args, &cli_args.output).await
-            }
+            GetResources::Pools(args) => pool::Pools::list(args, output).await,
+            GetResources::Pool(args) => pool::Pool::get(&args.pool_id(), args, output).await,
+            GetResources::Nodes(args) => node::Nodes::list(args, output).await,
+            GetResources::Node(args) => node::Node::get(&args.node_id(), args, output).await,
             GetResources::BlockDevices(bdargs) => {
-                blockdevice::BlockDevice::get_blockdevices(
-                    &bdargs.node_id(),
-                    &bdargs.all(),
-                    &cli_args.output,
-                )
-                .await
+                blockdevice::BlockDevice::get_blockdevices(&bdargs.node_id(), &bdargs.all(), output)
+                    .await
             }
             GetResources::VolumeSnapshots(snapargs) => {
                 snapshot::VolumeSnapshots::get_snapshots(
                     &snapargs.volume(),
                     &snapargs.snapshot(),
-                    &cli_args.output,
+                    output,
                 )
                 .await
             }
@@ -184,7 +190,7 @@ impl ExecuteOperation for GetResources {
                 snapshot::VolumeSnapshots::get_snapshot_topology(
                     &snapargs.volume(),
                     &snapargs.snapshot(),
-                    &cli_args.output,
+                    output,
                 )
                 .await
             }
@@ -196,10 +202,15 @@ impl ExecuteOperation for GetResources {
 impl ExecuteOperation for ScaleResources {
     type Args = CliArgs;
     type Error = crate::resources::Error;
-    async fn execute(&self, cli_args: &CliArgs) -> PluginResult {
+    async fn execute(
+        &self,
+        _cli_args: impl clap::Parser,
+        output: Option<&OutputFormat>,
+    ) -> PluginResult {
+        let output = output.ok_or(OutputFormatAbsentSnafu.build())?;
         match self {
             ScaleResources::Volume { id, replica_count } => {
-                volume::Volume::scale(id, *replica_count, &cli_args.output).await
+                volume::Volume::scale(id, *replica_count, output).await
             }
         }
     }
@@ -209,10 +220,15 @@ impl ExecuteOperation for ScaleResources {
 impl ExecuteOperation for SetPropertyResources {
     type Args = CliArgs;
     type Error = crate::resources::Error;
-    async fn execute(&self, cli_args: &CliArgs) -> PluginResult {
+    async fn execute(
+        &self,
+        _cli_args: impl clap::Parser,
+        output: Option<&OutputFormat>,
+    ) -> PluginResult {
+        let output = output.ok_or(OutputFormatAbsentSnafu.build())?;
         match self {
             SetPropertyResources::Volume { id, properties } => {
-                volume::Volume::set_property(id, properties, &cli_args.output).await
+                volume::Volume::set_property(id, properties, output).await
             }
         }
     }
@@ -222,11 +238,14 @@ impl ExecuteOperation for SetPropertyResources {
 impl ExecuteOperation for CordonResources {
     type Args = CliArgs;
     type Error = crate::resources::Error;
-    async fn execute(&self, cli_args: &CliArgs) -> PluginResult {
+    async fn execute(
+        &self,
+        _cli_args: impl clap::Parser,
+        output: Option<&OutputFormat>,
+    ) -> PluginResult {
+        let output = output.ok_or(OutputFormatAbsentSnafu.build())?;
         match self {
-            CordonResources::Node { id, label } => {
-                node::Node::cordon(id, label, &cli_args.output).await
-            }
+            CordonResources::Node { id, label } => node::Node::cordon(id, label, output).await,
         }
     }
 }
@@ -235,11 +254,14 @@ impl ExecuteOperation for CordonResources {
 impl ExecuteOperation for UnCordonResources {
     type Args = CliArgs;
     type Error = crate::resources::Error;
-    async fn execute(&self, cli_args: &CliArgs) -> PluginResult {
+    async fn execute(
+        &self,
+        _cli_args: impl clap::Parser,
+        output: Option<&OutputFormat>,
+    ) -> PluginResult {
+        let output = output.ok_or(OutputFormatAbsentSnafu.build())?;
         match self {
-            UnCordonResources::Node { id, label } => {
-                node::Node::uncordon(id, label, &cli_args.output).await
-            }
+            UnCordonResources::Node { id, label } => node::Node::uncordon(id, label, output).await,
         }
     }
 }
@@ -248,18 +270,23 @@ impl ExecuteOperation for UnCordonResources {
 impl ExecuteOperation for LabelResources {
     type Args = CliArgs;
     type Error = crate::resources::Error;
-    async fn execute(&self, cli_args: &CliArgs) -> PluginResult {
+    async fn execute(
+        &self,
+        _cli_args: impl clap::Parser,
+        output: Option<&OutputFormat>,
+    ) -> PluginResult {
+        let output = output.ok_or(OutputFormatAbsentSnafu.build())?;
         match self {
             LabelResources::Node {
                 id,
                 label,
                 overwrite,
-            } => node::Node::label(id, label.to_string(), *overwrite, &cli_args.output).await,
+            } => node::Node::label(id, label.to_string(), *overwrite, output).await,
             LabelResources::Pool {
                 id,
                 label,
                 overwrite,
-            } => pool::Pool::label(id, label.to_string(), *overwrite, &cli_args.output).await,
+            } => pool::Pool::label(id, label.to_string(), *overwrite, output).await,
         }
     }
 }

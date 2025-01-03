@@ -102,6 +102,9 @@ pub enum Error {
         key1=value1,key2=value2"
     ))]
     LabelNodeFilter { labels: String },
+
+    #[snafu(display("Expected output to be a Some"))]
+    OutputFormatAbsent,
 }
 
 /// Errors related to label topology formats.

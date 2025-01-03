@@ -54,7 +54,7 @@ impl CliArgs {
         )
         .context(RestClientSnafu)?;
         self.operation
-            .execute(&self.args)
+            .execute(CliArgs::args().args, Some(&CliArgs::args().args.output))
             .await
             .context(ResourcesSnafu)
     }
