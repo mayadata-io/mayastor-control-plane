@@ -68,7 +68,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_1_NAME,
         "pool_uuid": NODE_1_POOL_1_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///disk1?size_mb=50"],
+            ["malloc:///disk1?size_mb=32"],
             labels={
                 DISKPOOL_LABEL_KEY: DISKPOOL_LABEL_VAL,
                 "node": "io-engine-1",
@@ -81,7 +81,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_2_NAME,
         "pool_uuid": NODE_2_POOL_1_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///disk1?size_mb=50"],
+            ["malloc:///disk1?size_mb=32"],
             labels={
                 DISKPOOL_LABEL_KEY: DISKPOOL_LABEL_VAL,
                 "node": "io-engine-2",
@@ -94,7 +94,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_3_NAME,
         "pool_uuid": NODE_3_POOL_1_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///disk1?size_mb=50"],
+            ["malloc:///disk1?size_mb=32"],
             labels={
                 DISKPOOL_LABEL_KEY: DISKPOOL_LABEL_VAL,
                 "node": "io-engine-3",
@@ -107,7 +107,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_1_NAME,
         "pool_uuid": NODE_1_POOL_2_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///disk2?size_mb=50"],
+            ["malloc:///disk2?size_mb=32"],
             labels={
                 DISKPOOL_LABEL_KEY: DISKPOOL_LABEL_VAL,
                 "node": "io-engine-1",
@@ -120,7 +120,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_2_NAME,
         "pool_uuid": NODE_2_POOL_2_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///disk2?size_mb=50"],
+            ["malloc:///disk2?size_mb=32"],
             labels={
                 DISKPOOL_LABEL_KEY: DISKPOOL_LABEL_VAL,
                 "node": "io-engine-2",
@@ -133,7 +133,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_3_NAME,
         "pool_uuid": NODE_3_POOL_2_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///disk2?size_mb=50"],
+            ["malloc:///disk2?size_mb=32"],
             labels={
                 DISKPOOL_LABEL_KEY: DISKPOOL_LABEL_VAL,
                 "node": "io-engine-3",
@@ -146,7 +146,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_1_NAME,
         "pool_uuid": NODE_1_POOL_3_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///disk3?size_mb=50"],
+            ["malloc:///disk3?size_mb=32"],
             labels={
                 DISKPOOL_LABEL_KEY: DISKPOOL_LABEL_VAL,
                 "node": "io-engine-1",
@@ -159,7 +159,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_2_NAME,
         "pool_uuid": NODE_2_POOL_3_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///disk3?size_mb=50"],
+            ["malloc:///disk3?size_mb=32"],
             labels={
                 DISKPOOL_LABEL_KEY: DISKPOOL_LABEL_VAL,
                 "node": "io-engine-2",
@@ -172,7 +172,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_3_NAME,
         "pool_uuid": NODE_3_POOL_3_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///disk3?size_mb=50"],
+            ["malloc:///disk3?size_mb=32"],
             labels={
                 DISKPOOL_LABEL_KEY: DISKPOOL_LABEL_VAL,
                 "node": "io-engine-3",
@@ -186,16 +186,19 @@ POOL_CONFIGURATIONS = [
 @pytest.fixture(scope="module")
 def init():
     Deployer.start(NUM_IO_ENGINES, io_engine_coreisol=True)
-    # Create the pools.
-    for config in POOL_CONFIGURATIONS:
-        ApiClient.pools_api().put_node_pool(
-            config["node_name"],
-            config["pool_uuid"],
-            config["pool_body"],
-        )
 
-    yield
-    Deployer.stop()
+    try:
+        # Create the pools.
+        for config in POOL_CONFIGURATIONS:
+            ApiClient.pools_api().put_node_pool(
+                config["node_name"],
+                config["pool_uuid"],
+                config["pool_body"],
+            )
+
+        yield
+    finally:
+        Deployer.stop()
 
 
 # Fixture used to pass the volume create request between test steps.

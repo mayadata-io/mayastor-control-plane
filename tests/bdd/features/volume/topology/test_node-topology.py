@@ -82,7 +82,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_1_NAME,
         "pool_uuid": NODE_1_POOL_1_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node1pool1?size_mb=50"],
+            ["malloc:///node1pool1?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-1",
@@ -94,7 +94,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_2_NAME,
         "pool_uuid": NODE_2_POOL_1_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node2pool1?size_mb=50"],
+            ["malloc:///node2pool1?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-2",
@@ -106,7 +106,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_3_NAME,
         "pool_uuid": NODE_3_POOL_1_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node3pool1?size_mb=50"],
+            ["malloc:///node3pool1?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-3",
@@ -118,7 +118,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_4_NAME,
         "pool_uuid": NODE_4_POOL_1_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node4pool1?size_mb=50"],
+            ["malloc:///node4pool1?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-4",
@@ -130,7 +130,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_5_NAME,
         "pool_uuid": NODE_5_POOL_1_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node5pool1?size_mb=50"],
+            ["malloc:///node5pool1?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-5",
@@ -142,7 +142,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_1_NAME,
         "pool_uuid": NODE_1_POOL_2_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node1pool2?size_mb=50"],
+            ["malloc:///node1pool2?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-1",
@@ -154,7 +154,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_2_NAME,
         "pool_uuid": NODE_2_POOL_2_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node2pool2?size_mb=50"],
+            ["malloc:///node2pool2?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-2",
@@ -166,7 +166,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_3_NAME,
         "pool_uuid": NODE_3_POOL_2_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node3pool2?size_mb=50"],
+            ["malloc:///node3pool2?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-3",
@@ -178,7 +178,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_4_NAME,
         "pool_uuid": NODE_4_POOL_2_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node4pool2?size_mb=50"],
+            ["malloc:///node4pool2?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-4",
@@ -190,7 +190,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_5_NAME,
         "pool_uuid": NODE_5_POOL_2_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node5pool2?size_mb=50"],
+            ["malloc:///node5pool2?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-5",
@@ -202,7 +202,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_1_NAME,
         "pool_uuid": NODE_1_POOL_3_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node1pool3?size_mb=50"],
+            ["malloc:///node1pool3?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-1",
@@ -214,7 +214,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_2_NAME,
         "pool_uuid": NODE_2_POOL_3_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node2pool3?size_mb=50"],
+            ["malloc:///node2pool3?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-2",
@@ -226,7 +226,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_3_NAME,
         "pool_uuid": NODE_3_POOL_3_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node3pool3?size_mb=50"],
+            ["malloc:///node3pool3?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-3",
@@ -238,7 +238,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_4_NAME,
         "pool_uuid": NODE_4_POOL_3_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node4pool3?size_mb=50"],
+            ["malloc:///node4pool3?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-4",
@@ -250,7 +250,7 @@ POOL_CONFIGURATIONS = [
         "node_name": NODE_5_NAME,
         "pool_uuid": NODE_5_POOL_3_UUID,
         "pool_body": CreatePoolBody(
-            ["malloc:///node5pool3?size_mb=50"],
+            ["malloc:///node5pool3?size_mb=32"],
             labels=disk_pool_label
             | {
                 "node": "io-engine-5",
@@ -275,21 +275,25 @@ NODE_LABELS = [
 @pytest.fixture(scope="module")
 def init():
     Deployer.start(NUM_IO_ENGINES, io_engine_coreisol=True)
-    # Create the nodes with labels.
-    for label, node_name in NODE_LABELS:
-        [key, value] = label.split("=")
-        ApiClient.nodes_api().put_node_label(node_name, key, value, overwrite="false")
 
-    # Create the pools.
-    for config in POOL_CONFIGURATIONS:
-        ApiClient.pools_api().put_node_pool(
-            config["node_name"],
-            config["pool_uuid"],
-            config["pool_body"],
-        )
+    try:
+        # Create the nodes with labels.
+        for label, node_name in NODE_LABELS:
+            [key, value] = label.split("=")
+            ApiClient.nodes_api().put_node_label(
+                node_name, key, value, overwrite="false"
+            )
 
-    yield
-    Deployer.stop()
+        # Create the pools.
+        for config in POOL_CONFIGURATIONS:
+            ApiClient.pools_api().put_node_pool(
+                config["node_name"],
+                config["pool_uuid"],
+                config["pool_body"],
+            )
+        yield
+    finally:
+        Deployer.stop()
 
 
 # Fixture used to pass the volume create request between test steps.

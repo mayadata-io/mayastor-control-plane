@@ -1,0 +1,31 @@
+name: Linter CI
+on:
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CI: 1
+
+jobs:
+  linter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - uses: DeterminateSystems/nix-installer-action@v14
+      - uses: DeterminateSystems/magic-nix-cache-action@v8
+      - name: Pre-populate nix-shell
+        run: |
+          export NIX_PATH=nixpkgs=$(jq '.nixpkgs.url' nix/sources.json -r)
+          echo "NIX_PATH=$NIX_PATH" >> $GITHUB_ENV
+          nix-shell --run "echo" shell.nix
+      - name: Handle Rust dependencies caching
+        uses: Swatinem/rust-cache@v2
+      - name: Lint rust code
+        run: nix-shell --run "./scripts/rust/linter.sh"
+      - name: Lint python code
+        run: nix-shell --run "black --diff --check tests/bdd/"
+      - name: Lint nix code
+        run: nix-shell --run "nixpkgs-fmt --check ."
