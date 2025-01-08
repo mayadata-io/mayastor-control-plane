@@ -26,7 +26,7 @@ use crate::{
     runtime,
 };
 
-use super::{Attach, Detach, DeviceError, DeviceName};
+use super::{Attach, AttachParameters, Detach, DeviceError, DeviceName};
 
 lazy_static::lazy_static! {
     static ref DEVICE_REGEX: Regex = Regex::new(r"nvme(\d{1,5})n(\d{1,5})").unwrap();
@@ -284,6 +284,14 @@ impl Attach for NvmfAttach {
             Ok(_) => Ok(()),
             Err(error) => Err(error),
         }
+    }
+
+    fn attach_parameters(&self) -> AttachParameters {
+        AttachParameters::Nvmf(super::NvmfAttachParameters {
+            _host: self.host.clone(),
+            _port: self.port,
+            transport: self.transport,
+        })
     }
 }
 

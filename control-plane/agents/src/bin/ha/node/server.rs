@@ -211,21 +211,31 @@ impl NodeAgentSvc {
             })
             .await
         {
-            Ok(_) => match Subsystem::get(
-                parsed_uri.host(),
-                &parsed_uri.port(),
-                parsed_uri.transport(),
-                parsed_uri.nqn().as_str(),
-            ) {
-                Ok(subsystem) => {
-                    tracing::info!(new_path, "Successfully connected to NVMe target");
-                    Ok(subsystem)
+            Ok(resp) => {
+                let connect_xprt = if let Some(t) = resp.into_inner().transport_used {
+                    TrType::try_from(t).unwrap_or(parsed_uri.transport())
+                } else {
+                    parsed_uri.transport()
+                };
+                match Subsystem::get(
+                    parsed_uri.host(),
+                    &parsed_uri.port(),
+                    connect_xprt,
+                    parsed_uri.nqn().as_str(),
+                ) {
+                    Ok(subsystem) => {
+                        tracing::info!(
+                            new_path,
+                            "Successfully connected({connect_xprt:?}) to NVMe target"
+                        );
+                        Ok(subsystem)
+                    }
+                    Err(error) => Err(SubsystemNotFound {
+                        nqn: nqn.clone(),
+                        details: error.to_string(),
+                    }),
                 }
-                Err(error) => Err(SubsystemNotFound {
-                    nqn: nqn.clone(),
-                    details: error.to_string(),
-                }),
-            },
+            }
             Err(error) => {
                 tracing::error!(
                     new_path,
