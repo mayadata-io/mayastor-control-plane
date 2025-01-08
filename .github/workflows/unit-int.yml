@@ -1,0 +1,51 @@
+name: Integration CI
+on:
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CI: 1
+
+jobs:
+  int-tests:
+    runs-on: ubuntu-latest-16-cores
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+      - uses: DeterminateSystems/nix-installer-action@v14
+      - uses: DeterminateSystems/magic-nix-cache-action@v8
+      - name: Pre-populate nix-shell
+        run: |
+          export NIX_PATH=nixpkgs=$(jq '.nixpkgs.url' nix/sources.json -r)
+          echo "NIX_PATH=$NIX_PATH" >> $GITHUB_ENV
+          nix-shell --run "echo" shell.nix
+      - name: Handle Rust dependencies caching
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ startsWith(github.ref_name, 'release/') || github.ref_name == 'develop' }}
+      - name: Build rust binaries
+        run: nix-shell --run "cargo build --bins"
+      - name: Build the tests
+        run: nix-shell --run "./scripts/rust/test.sh --no-run"
+      - name: Setup Test Pre-Requisites
+        run: |
+          sudo sysctl -w vm.nr_hugepages=2560
+          sudo apt-get install linux-modules-extra-$(uname -r)
+          sudo modprobe nvme_tcp
+      - name: Run Tests
+        run: |
+          # pre-pull the required container images
+          deployer start --image-pull-policy always -w 60s && deployer stop
+          # includes both unit and integration tests
+          nix-shell --run "./scripts/rust/test.sh"
+      - name: Cleanup
+        if: always()
+        run: nix-shell --run "./scripts/rust/deployer-cleanup.sh"
+# debugging
+      # - name: Setup tmate session
+      #   if: ${{ failure() }}
+      #   timeout-minutes: 120
+      #   uses: mxschmitt/action-tmate@v3

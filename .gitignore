@@ -26,4 +26,5 @@ __pycache__
 /rpc/mayastor-api
 /local-fio-0-verify.state
 /report.xml
+/docker-logs.txt
 /.tmp

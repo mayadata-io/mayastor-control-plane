@@ -16,6 +16,7 @@ set -e
 SCRIPT_DIR="$(dirname "$0")"
 export ROOT_DIR="$SCRIPT_DIR/../.."
 REPORT="$ROOT_DIR/report.xml"
+export FAILED_DOCKER_LOGS="$ROOT_DIR/docker-logs.txt"
 
 cleanup() {
   "$SCRIPT_DIR"/test-residue-cleanup.sh || true
@@ -45,6 +46,7 @@ fi
 . "$ROOT_DIR"/tests/bdd/setup.sh
 
 cleanup >/dev/null
+[ -f "$FAILED_DOCKER_LOGS" ] && rm "$FAILED_DOCKER_LOGS"
 if ! [[ "${DISABLE[*]}" =~ "${CLEAN:-yes}" ]]; then
   trap cleanup_handler INT QUIT TERM HUP EXIT
 fi

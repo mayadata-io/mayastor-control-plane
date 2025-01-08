@@ -15,15 +15,18 @@ logger = logging.getLogger(__name__)
 
 def ready_http_get(context_msg_prefix: str):
     try:
-        response = requests.get("http://localhost:8081/ready", timeout=(0.003, 0.010))
+        response = requests.get("http://localhost:8081/ready", timeout=(0.3, 0.3))
         logger.info(
             f"{context_msg_prefix}: response.status_code: {response.status_code}"
         )
         return response
-    except requests.exceptions.Timeout:
+    except requests.exceptions.Timeout as e:
         logger.error(f"{context_msg_prefix}: the request timed out")
+        raise e
+
     except requests.exceptions.RequestException as e:
         logger.error(f"{context_msg_prefix}: an error occurred: {e}")
+        raise e
 
 
 @pytest.fixture(scope="module")
@@ -34,7 +37,7 @@ def setup():
 
 
 @scenario(
-    "readiness_probe.feature",
+    "readiness-probe.feature",
     "The REST API /ready service should not update its readiness status more than once in the cache refresh period",
 )
 def test_the_rest_api_ready_service_should_not_update_its_readiness_status_more_than_once_in_the_cache_refresh_period(

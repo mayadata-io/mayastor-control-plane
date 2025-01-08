@@ -25,13 +25,13 @@ VOLUME1_SIZE = 1024 * 1024 * 10
 SNAP1_UUID = "3f49d30d-a446-4b40-b3f6-f439345f1ce9"
 
 
-@scenario("garbage_collection.feature", "Garbage collection for failed transactions")
+@scenario("garbage-collection.feature", "Garbage collection for failed transactions")
 def test_garbage_collection_for_failed_transactions():
     """Garbage collection for failed transactions."""
 
 
 @scenario(
-    "garbage_collection.feature",
+    "garbage-collection.feature",
     "Garbage collection for stuck creating snapshots when source is deleted",
 )
 def test_garbage_collection_for_stuck_creating_snapshots_when_source_is_deleted():
