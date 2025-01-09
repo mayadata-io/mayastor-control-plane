@@ -1,5 +1,7 @@
 #[cfg(test)]
 use crate::resources::utils::{print_table, CreateRows, GetHeaderRow, OutputFormat};
+use crate::{rest_wrapper::RestClient, ExecuteOperation};
+
 use deployer_cluster::{Cluster, ClusterBuilder};
 use gag::BufferRedirect;
 use once_cell::sync::OnceCell;
@@ -8,16 +10,18 @@ use openapi::{
     models::{CreateVolumeBody, NodeState, PoolState, VolumeSpec, VolumeState},
 };
 use serde::ser;
-use std::io::Read;
+use std::{io::Read, str::FromStr, time::Duration};
 
 static CLUSTER: OnceCell<std::sync::Mutex<Option<std::sync::Arc<Cluster>>>> = OnceCell::new();
 const VOLUME_UUID: &str = "1e3cf927-80c2-47a8-adf0-95c486bdd7b7";
+const CACHE_PERIOD: &str = "10ms";
 
 async fn setup() {
     let cluster = ClusterBuilder::builder()
         .with_rest(true)
         .with_io_engines(1)
         .with_pools(1)
+        .with_cache_period(CACHE_PERIOD)
         .build()
         .await
         .unwrap();
@@ -40,6 +44,13 @@ async fn setup() {
         )
         .await
         .unwrap();
+
+    RestClient::init(
+        cluster.rest_url().clone(),
+        false,
+        Duration::from_millis(200),
+    )
+    .unwrap();
 
     CLUSTER
         .set(std::sync::Mutex::new(Some(std::sync::Arc::new(cluster))))
@@ -251,7 +262,7 @@ async fn get_pools() {
         .await
         .unwrap();
     let pool_state = pools[0].state.as_ref().unwrap().clone();
-    compare(pool_output(pool_state), pools);
+    compare(pool_output(pool_state, pools[0].spec.is_some()), pools);
 }
 
 #[tokio::test]
@@ -264,7 +275,31 @@ async fn get_pool() {
         .await
         .unwrap();
     let pool_state = pool.state.as_ref().unwrap().clone();
-    compare(pool_output(pool_state), pool);
+    compare(pool_output(pool_state, pool.spec.is_some()), pool);
+}
+
+#[tokio::test]
+async fn get_pool_unmanaged() {
+    let cluster = cluster().await;
+
+    let mut rpc_handle = cluster.grpc_handle(cluster.node(0).as_str()).await.unwrap();
+
+    rpc_handle
+        .create_pool(cluster.pool(0, 1).as_str(), "malloc:///p?size_mb=32")
+        .await
+        .unwrap();
+
+    let cache_period = humantime::Duration::from_str(CACHE_PERIOD).unwrap();
+    tokio::time::sleep(Duration::from_millis((cache_period.as_millis() * 2) as u64)).await;
+
+    let pool = cluster
+        .rest_v00()
+        .pools_api()
+        .get_pool(cluster.pool(0, 1).as_str())
+        .await
+        .unwrap();
+    let pool_state = pool.state.as_ref().unwrap().clone();
+    compare(pool_output(pool_state, pool.spec.is_some()), pool);
 }
 
 #[tokio::test]
@@ -326,6 +361,29 @@ async fn get_replica_topology() {
     );
 }
 
+#[tokio::test]
+async fn get_blockdevices_unmanaged() {
+    let cluster = cluster().await;
+
+    let mut rpc_handle = cluster.grpc_handle(cluster.node(0).as_str()).await.unwrap();
+
+    rpc_handle
+        .create_pool(cluster.pool(0, 1).as_str(), "malloc:///p?size_mb=32")
+        .await
+        .ok();
+
+    let cache_period = humantime::Duration::from_str(CACHE_PERIOD).unwrap();
+    tokio::time::sleep(Duration::from_millis((cache_period.as_millis() * 2) as u64)).await;
+
+    let op = crate::Operations::Get(crate::GetResources::BlockDevices(
+        crate::resources::BlockDeviceArgs {
+            node_id: cluster.node(0).to_string(),
+            all: false,
+        },
+    ));
+    op.execute(&crate::CliArgs::test_test()).await.unwrap();
+}
+
 // Compares the print_table output redirected to buffer with the expected string
 fn compare<T>(expected_output: String, obj: T)
 where
@@ -340,25 +398,35 @@ where
     assert_eq!(&actual_output[..], expected_output);
 }
 
-fn pool_output(pool_state: PoolState) -> String {
+fn pool_output(pool_state: PoolState, managed: bool) -> String {
     let disks: String = pool_state.disks.join(", ");
+    let capacity = ::utils::bytes::into_human(pool_state.capacity);
+    let allocated = ::utils::bytes::into_human(pool_state.used);
+    let available = ::utils::bytes::into_human(pool_state.capacity - pool_state.used);
+    let committed = ::utils::bytes::into_human(pool_state.committed.unwrap_or_default());
     format!(
-        " {:id_width$}TOTAL CAPACITY  USED CAPACITY  {:disk_width$}{:node_width$}STATUS  MANAGED \n",
+        " {:id_width$}{:disk_width$}{:managed_width$}  {:node_width$}STATUS  {:capacity_width$}  {:allocated_width$}  {:available_width$}  {:committed_width$} \n",
         "ID",
         "DISKS",
+        "MANAGED",
         "NODE",
+        "CAPACITY",
+        "ALLOCATED",
+        "AVAILABLE",
+        "COMMITTED",
         id_width = pool_state.id.len() + 2,
         disk_width = disks.len() + 2,
-        node_width = pool_state.node.len() + 2
+        managed_width = managed.to_string().len() + 2,
+        node_width = pool_state.node.len() + 2,
+        capacity_width = capacity.len() + 2,
+        allocated_width = allocated.len() + 2,
+        available_width = available.len() + 2,
+        committed_width = committed.len() + 2
     ) + &*format!(
-        " {}  {}       {}        {}  {}  {}  {} \n",
-        pool_state.id,
-        pool_state.capacity,
-        pool_state.used,
-        disks,
-        pool_state.node,
-        pool_state.status.to_string(),
-        true
+        " {id}  {disks}  {managed}    {node}  {status}  {capacity}     {allocated}        {available}      {committed} \n",
+        id = pool_state.id,
+        node = pool_state.node,
+        status = pool_state.status.to_string(),
     )
 }
 

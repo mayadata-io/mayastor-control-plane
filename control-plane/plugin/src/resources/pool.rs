@@ -1,4 +1,5 @@
 extern crate utils as external_utils;
+use super::VolumeId;
 use crate::{
     operations::{GetWithArgs, Label, ListWithArgs, PluginResult},
     resources::{
@@ -19,8 +20,6 @@ use prettytable::{Cell, Row};
 use serde::Serialize;
 use snafu::ResultExt;
 use std::collections::HashMap;
-
-use super::VolumeId;
 
 /// Pools resource.
 #[derive(clap::Args, Debug)]

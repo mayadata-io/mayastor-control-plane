@@ -26,7 +26,7 @@ use grpc::{
         replica::traits::ReplicaOperations, volume::traits::VolumeOperations,
     },
 };
-use openapi::models::Volume;
+use openapi::{apis::Url, models::Volume};
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::Resource;
@@ -479,6 +479,11 @@ impl Cluster {
     /// openapi rest client v0
     pub fn rest_v00(&self) -> openapi::tower::client::direct::ApiClient {
         self.rest_client.v0()
+    }
+
+    /// Get the openapi rest url.
+    pub fn rest_url(&self) -> &Url {
+        self.rest_client.url()
     }
 
     /// New cluster

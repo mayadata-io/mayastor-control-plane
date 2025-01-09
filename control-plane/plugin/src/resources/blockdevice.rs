@@ -28,13 +28,13 @@ struct BlockDeviceAll(openapi::models::BlockDevice);
 struct BlockDeviceUsable(openapi::models::BlockDevice);
 
 #[derive(Debug, Clone, clap::Args)]
-/// BlockDevice args
+/// BlockDevice args.
 pub struct BlockDeviceArgs {
-    /// Id of the node
-    node_id: NodeId,
+    /// Id of the node.
+    pub(crate) node_id: NodeId,
     #[clap(long)]
     /// Shows all devices if invoked, otherwise shows usable disks.
-    all: bool,
+    pub(crate) all: bool,
 }
 
 impl BlockDeviceArgs {
@@ -136,8 +136,8 @@ impl GetBlockDevices for BlockDevice {
                 for pool in pools.into_body() {
                     let mut normalized_disks: Vec<String> = pool
                         .spec
-                        .unwrap()
-                        .disks
+                        .map(|spec| spec.disks)
+                        .unwrap_or_default()
                         .into_iter()
                         .map(|disk| normalize_disk(disk.as_str()))
                         .collect();
