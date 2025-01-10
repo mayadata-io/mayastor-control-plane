@@ -31,7 +31,9 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 #[derive(Debug, Default)]
-pub(crate) struct NodePluginSvc {}
+pub(crate) struct NodePluginSvc {
+    kubelet_path: String,
+}
 
 #[tonic::async_trait]
 impl NodePlugin for NodePluginSvc {
@@ -105,7 +107,7 @@ impl NodePlugin for NodePluginSvc {
                 })?;
 
                 if let Ok(Some(device)) = Device::lookup(&uuid).await {
-                    let mountpaths = findmnt::get_mountpaths(&device.devname())?;
+                    let mountpaths = findmnt::get_mountpaths(&device.devname()).await?;
                     debug!(
                         "Device: {} found, with mount paths: {}, issuing unmount",
                         device.devname(),
@@ -117,7 +119,8 @@ impl NodePlugin for NodePluginSvc {
                     );
                     lazy_unmount_mountpaths(&mountpaths).await?;
                 } else {
-                    let mountpaths = findmnt::get_csi_mountpaths(&volume_id).await?;
+                    let mountpaths =
+                        findmnt::get_csi_mountpaths(&volume_id, Some(&self.kubelet_path)).await?;
                     debug!(
                         "Device was not found, detected mount paths: {}, issuing unmount",
                         mountpaths
@@ -149,13 +152,16 @@ pub(crate) struct NodePluginGrpcServer {}
 
 impl NodePluginGrpcServer {
     /// Run `Self` as a tonic server.
-    pub(crate) async fn run(endpoint: std::net::SocketAddr) -> anyhow::Result<()> {
+    pub(crate) async fn run(
+        endpoint: std::net::SocketAddr,
+        kubelet_path: String,
+    ) -> anyhow::Result<()> {
         info!(
             "node plugin gRPC server configured at address {:?}",
             endpoint
         );
         Server::builder()
-            .add_service(NodePluginServer::new(NodePluginSvc {}))
+            .add_service(NodePluginServer::new(NodePluginSvc { kubelet_path }))
             .serve_with_shutdown(endpoint, Shutdown::wait())
             .await
             .map_err(|error| {

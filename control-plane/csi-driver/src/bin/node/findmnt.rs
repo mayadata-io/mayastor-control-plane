@@ -1,10 +1,10 @@
 use crate::{error::DeviceError, filesystem_ops::FileSystem};
 use csi_driver::filesystem::FileSystem as Fs;
+use utils::csi_plugin_name;
 
 use serde_json::Value;
-use std::{collections::HashMap, process::Command, str::FromStr, string::String, vec::Vec};
+use std::{collections::HashMap, str::FromStr, string::String, vec::Vec};
 use tracing::{error, warn};
-use utils::csi_plugin_name;
 
 // Keys of interest we expect to find in the JSON output generated
 // by findmnt.
@@ -145,8 +145,12 @@ const FIND_MNT_ARGS: [&str; 3] = ["-J", "-o", "SOURCE,TARGET,FSTYPE"];
 
 /// Execute the Linux utility findmnt, collect the json output,
 /// invoke the filter function and return the filtered results.
-fn findmnt(params: Filter) -> Result<Vec<HashMap<String, String>>, DeviceError> {
-    let output = Command::new(FIND_MNT).args(FIND_MNT_ARGS).output()?;
+async fn findmnt(params: Filter<'_>) -> Result<Vec<HashMap<String, String>>, DeviceError> {
+    let output = tokio::process::Command::new(FIND_MNT)
+        .args(FIND_MNT_ARGS)
+        .output()
+        .await?;
+
     if output.status.success() {
         let json_str = String::from_utf8(output.stdout)?;
         let json: Value = serde_json::from_str(&json_str)?;
@@ -161,12 +165,12 @@ fn findmnt(params: Filter) -> Result<Vec<HashMap<String, String>>, DeviceError> 
 /// Use the Linux utility findmnt to find the name of the device mounted at a
 /// directory or block special file, if any.
 /// mount_path is the path a device is mounted on.
-pub(crate) fn get_devicepath(mount_path: &str) -> Result<Option<String>, DeviceError> {
+pub(crate) async fn get_devicepath(mount_path: &str) -> Result<Option<String>, DeviceError> {
     let tgt_filter = Filter {
         key: TARGET_KEY,
         value: mount_path,
     };
-    let sources = findmnt(tgt_filter)?;
+    let sources = findmnt(tgt_filter).await?;
     {
         match sources.len() {
             0 => Ok(None),
@@ -194,12 +198,12 @@ pub(crate) fn get_devicepath(mount_path: &str) -> Result<Option<String>, DeviceE
 /// Use the Linux utility findmnt to find the mount paths for a block device,
 /// if any.
 /// device_path is the path to the device for example "/dev/sda1"
-pub(crate) fn get_mountpaths(device_path: &str) -> Result<Vec<DeviceMount>, DeviceError> {
+pub(crate) async fn get_mountpaths(device_path: &str) -> Result<Vec<DeviceMount>, DeviceError> {
     let dev_filter = Filter {
         key: SOURCE_KEY,
         value: device_path,
     };
-    match findmnt(dev_filter) {
+    match findmnt(dev_filter).await {
         Ok(results) => {
             let mut mountpaths: Vec<DeviceMount> = Vec::new();
             for entry in results {
@@ -249,8 +253,18 @@ struct FilterCsiMounts<'a> {
 }
 
 /// Finds CSI mount points using `findmnt` and filters based on the given criteria.
-fn find_csi_mount(filter: FilterCsiMounts) -> Result<Vec<HashMap<String, String>>, DeviceError> {
-    let output = Command::new(FIND_MNT).args(FIND_MNT_ARGS).output()?;
+async fn find_csi_mount(
+    filter: FilterCsiMounts<'_>,
+    path_prefix: Option<&str>,
+) -> Result<Vec<HashMap<String, String>>, DeviceError> {
+    let mut command = tokio::process::Command::new(FIND_MNT);
+    command.args(FIND_MNT_ARGS);
+
+    if let Some(path_prefix) = path_prefix {
+        command.args(["-R", path_prefix]);
+    }
+
+    let output = command.output().await?;
 
     if !output.status.success() {
         return Err(DeviceError::new(String::from_utf8(output.stderr)?.as_str()));
@@ -321,14 +335,17 @@ fn read_vol_data_json(path: &str) -> Result<serde_json::Map<String, Value>, Devi
 }
 
 /// Retrieves mount paths for a given CSI volume ID by parsing the metadata file.
-pub(crate) async fn get_csi_mountpaths(volume_id: &str) -> Result<Vec<DeviceMount>, DeviceError> {
+pub(crate) async fn get_csi_mountpaths(
+    volume_id: &str,
+    path_prefix: Option<&str>,
+) -> Result<Vec<DeviceMount>, DeviceError> {
     let filter = FilterCsiMounts {
         driver: &csi_plugin_name(),
         volume_id,
         file_name: METADATA_FILE,
         device_pattern: DEVICE_PATTERN,
     };
-    match find_csi_mount(filter) {
+    match find_csi_mount(filter, path_prefix).await {
         Ok(results) => {
             let mut mountpaths: Vec<DeviceMount> = Vec::new();
             for entry in results {

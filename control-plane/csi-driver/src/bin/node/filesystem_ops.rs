@@ -230,6 +230,7 @@ impl FileSystemOps for Ext4Fs {
         let dev_path = match dev_path {
             Some(path) => path,
             None => get_devicepath(mount_path)
+                .await
                 .map_err(|error| {
                     format!("failed to get dev path for mountpoint {mount_path}: {error}")
                 })?

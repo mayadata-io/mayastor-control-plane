@@ -67,12 +67,12 @@ pub(crate) async fn fsfreeze(volume_id: &str, command: FsFreezeOpt) -> Result<()
         // Use findmnt to work out if volume is mounted as a raw
         // block, i.e. we get some matches, and return the
         // BlockDeviceMount error.
-        let mountpaths = findmnt::get_mountpaths(&device_path).map_err(|error| {
-            FsfreezeError::InternalFailure {
+        let mountpaths = findmnt::get_mountpaths(&device_path)
+            .await
+            .map_err(|error| FsfreezeError::InternalFailure {
                 source: error,
                 volume_id: volume_id.to_string(),
-            }
-        })?;
+            })?;
         if !mountpaths.is_empty() {
             return Err(FsfreezeError::BlockDeviceMount {
                 volume_id: volume_id.to_string(),
