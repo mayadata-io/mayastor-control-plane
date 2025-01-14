@@ -87,6 +87,15 @@ impl CliArgs {
             _span: jaeger.map(|_| tracing::info_span!(env!("CARGO_PKG_NAME")).entered()),
         }
     }
+    /// A fake `Self` for testing.
+    #[cfg(test)]
+    pub(crate) fn test_test() -> Self {
+        Self {
+            output: resources::utils::OutputFormat::None,
+            jaeger: None,
+            timeout: std::time::Duration::from_millis(200).into(),
+        }
+    }
 }
 
 #[async_trait::async_trait(?Send)]
