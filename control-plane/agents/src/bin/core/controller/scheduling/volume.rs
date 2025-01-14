@@ -5,13 +5,12 @@ use crate::controller::{
         affinity_group::{get_pool_ag_replica_count, get_restricted_nodes},
         pool::replica_rebuildable,
         resources::{ChildItem, PoolItem, PoolItemLister, ReplicaItem},
-        volume_policy::{SimplePolicy, ThickPolicy},
+        volume_policy::{node::NodeFilters, SimplePolicy, ThickPolicy},
         AddReplicaFilters, AddReplicaSorters, ChildSorters, ResourceData, ResourceFilter,
     },
     wrapper::PoolWrapper,
 };
 use agents::errors::SvcError;
-use std::{collections::HashMap, ops::Deref};
 use stor_port::types::v0::{
     store::{
         nexus::NexusSpec, nexus_persistence::NexusInfo, snapshots::replica::ReplicaSnapshot,
@@ -19,6 +18,8 @@ use stor_port::types::v0::{
     },
     transport::{NodeId, PoolId, VolumeState},
 };
+
+use std::{collections::HashMap, ops::Deref};
 
 /// Move replica to another pool.
 #[derive(Default, Clone)]
@@ -343,6 +344,21 @@ impl GetChildForRemovalContext {
                     }),
                     ag_rep_count,
                 )
+                .with_node_topology({
+                    Some(NodeFilters::topology_replica(
+                        &self.spec,
+                        &self.registry,
+                        replica_spec.pool_name(),
+                    ))
+                })
+                .with_pool_topology({
+                    use crate::controller::scheduling::volume_policy::pool::PoolBaseFilters;
+                    Some(PoolBaseFilters::topology_(
+                        &self.spec,
+                        &self.registry,
+                        replica_spec.pool_name(),
+                    ))
+                })
             })
             .collect::<Vec<_>>()
     }

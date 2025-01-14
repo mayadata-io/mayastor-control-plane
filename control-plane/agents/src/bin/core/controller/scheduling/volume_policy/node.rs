@@ -1,11 +1,18 @@
-use crate::controller::scheduling::{
-    nexus::GetSuitableNodesContext,
-    resources::{NodeItem, PoolItem},
-    volume::GetSuitablePoolsContext,
-    volume_policy::qualifies_label_criteria,
+use crate::controller::{
+    registry::Registry,
+    scheduling::{
+        nexus::GetSuitableNodesContext,
+        resources::{NodeItem, PoolItem},
+        volume::GetSuitablePoolsContext,
+        volume_policy::qualifies_label_criteria,
+    },
 };
+use stor_port::types::v0::{
+    store::volume::VolumeSpec,
+    transport::{NodeId, NodeTopology, PoolId},
+};
+
 use std::collections::HashMap;
-use stor_port::types::v0::transport::NodeTopology;
 
 /// Filter nodes used for replica creation.
 pub(crate) struct NodeFilters {}
@@ -72,9 +79,24 @@ impl NodeFilters {
     }
     /// Should only attempt to use nodes having specific creation label if topology has it.
     pub(crate) fn topology(request: &GetSuitablePoolsContext, item: &PoolItem) -> bool {
+        Self::topology_(request, request.registry(), &item.pool.node)
+    }
+    /// Should only attempt to use nodes having specific creation label if topology has it.
+    pub(crate) fn topology_replica(
+        volume: &VolumeSpec,
+        registry: &Registry,
+        pool_id: &PoolId,
+    ) -> bool {
+        let Ok(pool) = registry.specs().pool(pool_id) else {
+            return false;
+        };
+        Self::topology_(volume, registry, &pool.node)
+    }
+    /// Should only attempt to use nodes having specific creation label if topology has it.
+    pub(crate) fn topology_(volume: &VolumeSpec, registry: &Registry, node_id: &NodeId) -> bool {
         let volume_node_topology_inclusion_labels: HashMap<String, String>;
         let volume_node_topology_exclusion_labels: HashMap<String, String>;
-        match &request.topology {
+        match &volume.topology {
             None => return true,
             Some(topology) => match &topology.node {
                 None => return true,
@@ -99,7 +121,7 @@ impl NodeFilters {
         };
 
         // We will reach this part of code only if the volume has inclusion/exclusion labels.
-        match request.registry().specs().node(&item.pool.node) {
+        match registry.specs().node(node_id) {
             Ok(spec) => {
                 qualifies_label_criteria(volume_node_topology_inclusion_labels, spec.labels())
                     && qualifies_label_criteria(
