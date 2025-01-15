@@ -64,29 +64,9 @@ pub struct CliArgs {
 impl CliArgs {
     /// Initialize tracing (including opentelemetry).
     pub fn init_tracing(&self) -> TracingFlusher {
-        let git_version = option_env!("GIT_VERSION").unwrap_or_else(utils::raw_version_str);
-        let tags =
-            utils::tracing_telemetry::default_tracing_tags(git_version, env!("CARGO_PKG_VERSION"));
-
-        let fmt_layer = match std::env::var("RUST_LOG") {
-            Ok(_) => FmtLayer::Stderr,
-            Err(_) => FmtLayer::None,
-        };
-
-        let jaeger = self.jaeger.as_ref();
-
-        utils::tracing_telemetry::TracingTelemetry::builder()
-            .with_writer(fmt_layer)
-            .with_style(FmtStyle::Pretty)
-            .with_colours(false)
-            .with_jaeger(jaeger.cloned())
-            .with_tracing_tags(tags)
-            .init(env!("CARGO_PKG_NAME"));
-
-        TracingFlusher {
-            _span: jaeger.map(|_| tracing::info_span!(env!("CARGO_PKG_NAME")).entered()),
-        }
+        init_tracing_with_jaeger(self.jaeger.as_ref())
     }
+
     /// A fake `Self` for testing.
     #[cfg(test)]
     pub(crate) fn test_test() -> Self {
@@ -95,6 +75,30 @@ impl CliArgs {
             jaeger: None,
             timeout: std::time::Duration::from_millis(200).into(),
         }
+    }
+}
+
+/// Init tracing with jaeger.
+pub fn init_tracing_with_jaeger(jaeger: Option<&String>) -> TracingFlusher {
+    let git_version = option_env!("GIT_VERSION").unwrap_or_else(utils::raw_version_str);
+    let tags =
+        utils::tracing_telemetry::default_tracing_tags(git_version, env!("CARGO_PKG_VERSION"));
+
+    let fmt_layer = match std::env::var("RUST_LOG") {
+        Ok(_) => FmtLayer::Stderr,
+        Err(_) => FmtLayer::None,
+    };
+
+    utils::tracing_telemetry::TracingTelemetry::builder()
+        .with_writer(fmt_layer)
+        .with_style(FmtStyle::Pretty)
+        .with_colours(false)
+        .with_jaeger(jaeger.cloned())
+        .with_tracing_tags(tags)
+        .init(env!("CARGO_PKG_NAME"));
+
+    TracingFlusher {
+        _span: jaeger.map(|_| tracing::info_span!(env!("CARGO_PKG_NAME")).entered()),
     }
 }
 
