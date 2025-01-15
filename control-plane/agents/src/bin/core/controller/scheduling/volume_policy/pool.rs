@@ -1,10 +1,17 @@
-use crate::controller::scheduling::{
-    resources::{ChildItem, PoolItem},
-    volume::{GetSuitablePoolsContext, ReplicaResizePoolsContext},
-    volume_policy::qualifies_label_criteria,
+use crate::controller::{
+    registry::Registry,
+    scheduling::{
+        resources::{ChildItem, PoolItem},
+        volume::{GetSuitablePoolsContext, ReplicaResizePoolsContext},
+        volume_policy::qualifies_label_criteria,
+    },
 };
+use stor_port::types::v0::{
+    store::volume::VolumeSpec,
+    transport::{PoolId, PoolStatus, PoolTopology},
+};
+
 use std::collections::HashMap;
-use stor_port::types::v0::transport::{PoolStatus, PoolTopology};
 
 /// Filter pools used for replica creation.
 pub(crate) struct PoolBaseFilters {}
@@ -77,27 +84,32 @@ impl PoolBaseFilters {
 
     /// Should only attempt to use pools having specific creation label if topology has it.
     pub(crate) fn topology(request: &GetSuitablePoolsContext, item: &PoolItem) -> bool {
+        Self::topology_(request, request.registry(), &item.pool.id)
+    }
+
+    /// Should only attempt to use pools having specific creation label if topology has it.
+    pub(crate) fn topology_(volume: &VolumeSpec, registry: &Registry, pool_id: &PoolId) -> bool {
         let volume_pool_topology_inclusion_labels: HashMap<String, String>;
-        match request.topology.clone() {
+        match &volume.topology {
             None => return true,
-            Some(topology) => match topology.pool {
+            Some(topology) => match &topology.pool {
                 None => return true,
-                Some(pool_topology) => match pool_topology {
+                Some(pool_topology) => match &pool_topology {
                     PoolTopology::Labelled(labelled_topology) => {
                         // The labels in Volume Pool Topology should match the pool labels if
                         // present, otherwise selection of any pool is allowed.
-                        if !labelled_topology.inclusion.is_empty() {
-                            volume_pool_topology_inclusion_labels = labelled_topology.inclusion
-                        } else {
+                        if labelled_topology.inclusion.is_empty() {
+                            // todo: missing exclusion check?
                             return true;
                         }
+                        volume_pool_topology_inclusion_labels = labelled_topology.inclusion.clone()
                     }
                 },
             },
         };
 
         // We will reach this part of code only if the volume has inclusion/exclusion labels.
-        match request.registry().specs().pool(&item.pool.id) {
+        match registry.specs().pool(pool_id) {
             Ok(spec) => match spec.labels {
                 None => false,
                 Some(pool_labels) => {

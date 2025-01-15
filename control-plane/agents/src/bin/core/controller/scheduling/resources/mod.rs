@@ -176,6 +176,8 @@ pub(crate) struct ReplicaItem {
     /// a Affinity Group and the already created volumes have replicas
     /// on this pool.
     ag_replicas_on_pool: Option<u64>,
+    valid_pool_topology: Option<bool>,
+    valid_node_topology: Option<bool>,
 }
 
 impl ReplicaItem {
@@ -197,7 +199,31 @@ impl ReplicaItem {
             child_spec,
             child_info,
             ag_replicas_on_pool,
+            valid_pool_topology: None,
+            valid_node_topology: None,
         }
+    }
+    /// Set the validity of the replica's node topology.
+    /// If set to false, this means the replica is not in sync with the volume topology and
+    /// therefore should be replaced by another replica which is in sync.
+    pub(crate) fn with_node_topology(mut self, valid_node_topology: Option<bool>) -> ReplicaItem {
+        self.valid_node_topology = valid_node_topology;
+        self
+    }
+    /// Set the validity of the replica's pool topology.
+    /// If set to false, this means the replica is not in sync with the volume topology and
+    /// therefore should be replaced by another replica which is in sync.
+    pub(crate) fn with_pool_topology(mut self, valid_pool_topology: Option<bool>) -> ReplicaItem {
+        self.valid_pool_topology = valid_pool_topology;
+        self
+    }
+    /// Get a reference to the node topology validity flag.
+    pub(crate) fn valid_node_topology(&self) -> &Option<bool> {
+        &self.valid_node_topology
+    }
+    /// Get a reference to the pool topology validity flag.
+    pub(crate) fn valid_pool_topology(&self) -> &Option<bool> {
+        &self.valid_pool_topology
     }
     /// Get a reference to the replica spec.
     pub(crate) fn spec(&self) -> &ReplicaSpec {
