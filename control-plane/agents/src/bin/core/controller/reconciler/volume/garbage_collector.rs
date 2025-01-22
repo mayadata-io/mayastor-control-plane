@@ -10,7 +10,7 @@ use crate::controller::{
 use agents::errors::SvcError;
 use stor_port::types::v0::{
     store::{nexus_persistence::NexusInfo, replica::ReplicaSpec, volume::VolumeSpec},
-    transport::{DestroyVolume, NexusOwners, ReplicaOwners, ResizeReplica, VolumeStatus},
+    transport::{DestroyVolume, NexusId, NexusOwners, ReplicaOwners, ResizeReplica, VolumeStatus},
 };
 use tracing::Instrument;
 
@@ -150,7 +150,6 @@ async fn disown_unused_nexuses(
     context: &PollContext,
 ) -> PollResult {
     let mut results = vec![];
-
     for nexus in context.specs().volume_nexuses(volume.uuid()) {
         if let Ok(mut nexus) = nexus.operation_guard() {
             if let Some(target) = volume.as_ref().target() {
@@ -158,8 +157,9 @@ async fn disown_unused_nexuses(
                     continue;
                 }
             }
-
-            nexus.warn_span(|| tracing::warn!("Attempting to disown unused nexus"));
+            nexus.info_span(|| {
+                tracing::info!("Disowning unused nexus from its volume");
+            });
             // the nexus garbage collector will destroy the disowned nexuses
             let owner = NexusOwners::Volume(volume.uuid().clone());
             match nexus.remove_owners(context.registry(), &owner, false).await {
@@ -206,7 +206,8 @@ async fn disown_unused_replicas(
         // don't attempt to disown the replicas if the volume state is faulted or unknown
         return PollResult::Ok(PollerState::Busy);
     }
-
+    let vol_nexus = context.specs().volume_nexuses(volume.uuid());
+    let vol_nexus_ids: Vec<&NexusId> = vol_nexus.iter().map(|n| n.uuid()).collect();
     let mut nexus_info = None; // defer reading from the persistent store unless we find a candidate
     let mut results = vec![];
 
@@ -221,12 +222,12 @@ async fn disown_unused_replicas(
         if !replica_online
             && !replica.as_ref().dirty()
             && replica.as_ref().owners.owned_by(volume.uuid())
-            && !replica.as_ref().owners.owned_by_a_nexus()
+            && !replica.as_ref().owned_by_nexus(&vol_nexus_ids)
             && !replica_in_target
             && !is_replica_healthy(context, &mut nexus_info, replica.as_ref(), volume.as_ref())
                 .await?
         {
-            volume.warn_span(|| tracing::warn!(replica.uuid = %replica.as_ref().uuid, "Attempting to disown unused replica"));
+            volume.info_span(|| tracing::info!(replica.uuid = %replica.as_ref().uuid, "Attempting to disown unused replica"));
 
             // the replica garbage collector will destroy the disowned replica
             match replica
