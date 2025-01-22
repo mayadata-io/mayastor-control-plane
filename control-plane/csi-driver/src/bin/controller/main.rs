@@ -104,6 +104,13 @@ async fn main() -> anyhow::Result<()> {
                 )
         )
         .arg(
+            Arg::new("enable-orphan-vol-gc")
+                .long("enable-orphan-vol-gc")
+                .default_value("false")
+                .value_parser(clap::value_parser!(bool))
+                .help("Enable orphan volume garbage collection")
+        )
+        .arg(
             Arg::new("fmt-style")
                 .long("fmt-style")
                 .default_value(FmtStyle::Pretty.as_ref())
@@ -160,10 +167,22 @@ async fn main() -> anyhow::Result<()> {
     // Try to detect REST API endpoint to debug the accessibility status.
     ping_rest_api().await;
 
-    // Starts PV Garbage Collector if platform type is k8s
-    if stor_port::platform::current_platform_type() == stor_port::platform::PlatformType::K8s {
-        let gc_instance = pvwatcher::PvGarbageCollector::new(orphan_period).await?;
-        tokio::spawn(async move { gc_instance.run_watcher().await });
+    let enable_orphan_gc = args.get_flag("enable-orphan-vol-gc");
+    info!(
+        "Orphaned Volumes Garbage Collector is {}",
+        if enable_orphan_gc {
+            "enabled"
+        } else {
+            "NOT enabled"
+        }
+    );
+
+    if enable_orphan_gc {
+        // Starts PV Garbage Collector if platform type is k8s
+        if stor_port::platform::current_platform_type() == stor_port::platform::PlatformType::K8s {
+            let gc_instance = pvwatcher::PvGarbageCollector::new(orphan_period).await?;
+            tokio::spawn(async move { gc_instance.run_watcher().await });
+        }
     }
 
     let result = server::CsiServer::run(csi_socket).await;
