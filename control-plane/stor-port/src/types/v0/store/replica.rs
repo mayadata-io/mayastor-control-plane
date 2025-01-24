@@ -8,8 +8,9 @@ use crate::{
             AsOperationSequencer, OperationSequence, SpecStatus, SpecTransaction,
         },
         transport::{
-            self, CreateReplica, HostNqn, PoolId, PoolUuid, Protocol, ReplicaId, ReplicaKind,
-            ReplicaName, ReplicaOwners, ReplicaShareProtocol, SnapshotCloneSpecParams, VolumeId,
+            self, CreateReplica, HostNqn, NexusId, PoolId, PoolUuid, Protocol, ReplicaId,
+            ReplicaKind, ReplicaName, ReplicaOwners, ReplicaShareProtocol, SnapshotCloneSpecParams,
+            VolumeId,
         },
     },
     IntoOption,
@@ -107,6 +108,13 @@ impl ReplicaSpec {
     /// Check if this replica is owned by the volume.
     pub fn owned_by(&self, id: &VolumeId) -> bool {
         self.owners.owned_by(id)
+    }
+    /// Check if this replica is owned by any of the nexus in volume spec.
+    pub fn owned_by_nexus(&self, nexus_id: &[&NexusId]) -> bool {
+        self.owners
+            .nexuses()
+            .iter()
+            .any(|owner| nexus_id.contains(&owner))
     }
 }
 
