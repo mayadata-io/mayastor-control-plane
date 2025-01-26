@@ -12,7 +12,13 @@ cleanup_ws_tmp() {
     echo "Found stale loop device: $device"
 
     $SUDO $(which vgremove) -y --select="pv_name=$device" || :
-    $SUDO losetup -d "$device"
+    $SUDO $(which pvremove) -y "$device" || :
+    $SUDO losetup -d "$device" || :
+
+    for file in $(losetup -l -J | jq -r --arg tmp_dir $tmp_dir --arg dev $device '.loopdevices[]|select((."back-file" | startswith($tmp_dir)) and .name == $dev) | ."back-file"'); do
+      [ "$file" == "(deleted)" ] && continue;
+      echo "Left stale file: $file"
+    done
   done
 
   $SUDO rm -rf "$tmp_dir"

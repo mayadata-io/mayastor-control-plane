@@ -28,3 +28,4 @@ __pycache__
 /report.xml
 /docker-logs.txt
 /.tmp
+/ci-report/
