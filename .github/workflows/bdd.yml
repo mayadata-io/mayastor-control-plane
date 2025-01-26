@@ -15,6 +15,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: 'recursive'
+      - run: echo "CI_REPORT_START_DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
       - uses: DeterminateSystems/nix-installer-action@v14
       - uses: DeterminateSystems/magic-nix-cache-action@v8
       - name: Pre-populate nix-shell
@@ -35,26 +36,26 @@ jobs:
         run: |
           nix-shell --run "deployer start --image-pull-policy always -w 60s && deployer stop"
           nix-shell --run "./scripts/python/test.sh"
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: failed-docker-logs
-          path: docker-logs.txt
       - name: Cleanup
         if: always()
         run: |
+          nix-shell --run "./scripts/ci-report.sh"
           nix-shell --run "./scripts/python/test-residue-cleanup.sh"
-          cat /proc/meminfo | grep -i huge
-      - name: Surface failing tests
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ci-report-bdd
+          path: ./ci-report/ci-report.tar.gz
+      - name: Pytest BDD Report
         if: always()
         uses: pmeier/pytest-results-action@main
         with:
-          path: report.xml
+          path: ci-report/bdd-report.xml
           summary: true
           display-options: a
           fail-on-empty: true
           title: Test results
-# debugging
+      # debugging
       # - name: Setup tmate session
       #   if: ${{ failure() }}
       #   timeout-minutes: 240

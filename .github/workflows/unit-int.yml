@@ -15,6 +15,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: 'recursive'
+      - run: echo "CI_REPORT_START_DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
       - uses: DeterminateSystems/nix-installer-action@v14
       - uses: DeterminateSystems/magic-nix-cache-action@v8
       - name: Pre-populate nix-shell
@@ -38,13 +39,20 @@ jobs:
       - name: Run Tests
         run: |
           # pre-pull the required container images
-          deployer start --image-pull-policy always -w 60s && deployer stop
+          nix-shell --run "deployer start --image-pull-policy always -w 60s && deployer stop"
           # includes both unit and integration tests
           nix-shell --run "./scripts/rust/test.sh"
       - name: Cleanup
         if: always()
-        run: nix-shell --run "./scripts/rust/deployer-cleanup.sh"
-# debugging
+        run: |
+          nix-shell --run "./scripts/ci-report.sh"
+          nix-shell --run "./scripts/rust/deployer-cleanup.sh"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ci-report-int
+          path: ./ci-report/ci-report.tar.gz
+      # debugging
       # - name: Setup tmate session
       #   if: ${{ failure() }}
       #   timeout-minutes: 120
