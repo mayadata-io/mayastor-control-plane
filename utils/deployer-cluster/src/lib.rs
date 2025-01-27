@@ -82,7 +82,7 @@ pub fn default_options() -> StartOptions {
         .with_jaeger(true)
         .with_io_engines(1)
         .with_show_info(true)
-        .with_build_all(true)
+        .with_build_all(!matches!(std::env::var("CI").as_deref(), Ok("1")))
         .with_env_tags(vec!["CARGO_PKG_NAME"])
 }
 
