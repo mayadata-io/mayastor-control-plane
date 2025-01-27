@@ -38,13 +38,20 @@ jobs:
       - name: Run Tests
         run: |
           # pre-pull the required container images
-          deployer start --image-pull-policy always -w 60s && deployer stop
+          nix-shell --run "deployer start --image-pull-policy always -w 60s && deployer stop"
           # includes both unit and integration tests
           nix-shell --run "./scripts/rust/test.sh"
       - name: Cleanup
         if: always()
-        run: nix-shell --run "./scripts/rust/deployer-cleanup.sh"
-# debugging
+        run: |
+          nix-shell --run "./scripts/ci-report.sh"
+          nix-shell --run "./scripts/rust/deployer-cleanup.sh"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-report
+          path: ./ci-report/ci-report.tar.gz
+      # debugging
       # - name: Setup tmate session
       #   if: ${{ failure() }}
       #   timeout-minutes: 120

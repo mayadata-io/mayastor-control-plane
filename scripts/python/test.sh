@@ -15,8 +15,9 @@ set -e
 
 SCRIPT_DIR="$(dirname "$0")"
 export ROOT_DIR="$SCRIPT_DIR/../.."
-REPORT="$ROOT_DIR/report.xml"
-export FAILED_DOCKER_LOGS="$ROOT_DIR/docker-logs.txt"
+CI_REPORT="$ROOT_DIR/ci-report"
+REPORT="$CI_REPORT/bdd-report.xml"
+export FAILED_DOCKER_LOGS="$CI_REPORT/docker-logs.txt"
 
 cleanup() {
   "$SCRIPT_DIR"/test-residue-cleanup.sh || true
@@ -50,6 +51,8 @@ cleanup >/dev/null
 if ! [[ "${DISABLE[*]}" =~ "${CLEAN:-yes}" ]]; then
   trap cleanup_handler INT QUIT TERM HUP EXIT
 fi
+
+mkdir -p "$CI_REPORT"
 
 # Extra arguments will be provided directly to pytest, otherwise the bdd folder will be tested with default arguments
 if [ $# -eq 0 ]; then

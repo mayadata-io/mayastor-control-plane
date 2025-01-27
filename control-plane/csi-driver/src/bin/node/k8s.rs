@@ -16,8 +16,8 @@ pub(crate) async fn patch_k8s_node(
     match nodes
         .patch(
             node_name,
-            &PatchParams::apply("node_label_patch").force(),
-            &Patch::Apply(node_patch),
+            &PatchParams::default(),
+            &Patch::Merge(node_patch),
         )
         .await
     {
