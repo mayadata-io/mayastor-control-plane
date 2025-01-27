@@ -8,12 +8,17 @@ cleanup_ws_tmp() {
   # This contains tmp for container artifacts, example: pool disk images
   tmp_dir="$(realpath "$ROOT_DIR/.tmp")"
 
-  devices=$(losetup -l -J | jq -r --arg tmp_dir=$tmp_dir '.loopdevices[]|select(."back-file" | startswith($tmp_dir))')
-  for device in $(echo $devices | jq -r '.loopdevices[].name'); do
+  for device in $(losetup -l -J | jq -r --arg tmp_dir $tmp_dir '.loopdevices[]|select(."back-file" | startswith($tmp_dir)) | .name'); do
     echo "Found stale loop device: $device"
 
     $SUDO $(which vgremove) -y --select="pv_name=$device" || :
-    $SUDO losetup -d "$device"
+    $SUDO $(which pvremove) -y "$device" || :
+    $SUDO losetup -d "$device" || :
+
+    for file in $(losetup -l -J | jq -r --arg tmp_dir $tmp_dir --arg dev $device '.loopdevices[]|select((."back-file" | startswith($tmp_dir)) and .name == $dev) | ."back-file"'); do
+      [ "$file" == "(deleted)" ] && continue;
+      echo "Left stale file: $file"
+    done
   done
 
   $SUDO rm -rf "$tmp_dir"
