@@ -1039,9 +1039,9 @@ async fn destroy_after_restart() {
 async fn slow_create() {
     const POOL_SIZE_BYTES: u64 = 128 * 1024 * 1024;
 
-    let vg = deployer_cluster::lvm::VolGroup::new("slow-pool", POOL_SIZE_BYTES).unwrap();
+    let vg = deployer_cluster::lvm::VolGroup::new("slow-pooly", POOL_SIZE_BYTES).unwrap();
     let lvol = vg.create_lvol("lvol0", POOL_SIZE_BYTES / 2).unwrap();
-    lvol.suspend().unwrap();
+    lvol.suspend_await().await.unwrap();
     {
         let cluster = ClusterBuilder::builder()
             .with_io_engines(1)
@@ -1062,12 +1062,15 @@ async fn slow_create() {
             labels: Some(PoolLabel::from([("a".into(), "b".into())])),
         };
 
-        let error = client
-            .pool()
-            .create(&create, None)
-            .await
-            .expect_err("device suspended");
-        assert_eq!(error.kind, ReplyErrorKind::Cancelled);
+        let result = client.pool().create(&create, None).await;
+        match result {
+            Err(error) => assert_eq!(error.kind, ReplyErrorKind::Cancelled),
+            Ok(_) => {
+                let info = lvol.dm_info().unwrap();
+                tracing::error!("Log DMSetup info:\n{info}");
+                panic!("Should have failed!");
+            }
+        }
 
         lvol.resume().unwrap();
 
@@ -1100,7 +1103,7 @@ async fn slow_create() {
         client.pool().destroy(&destroy, None).await.unwrap();
 
         // Now we try to recreate using an API call, rather than using the reconciler
-        lvol.suspend().unwrap();
+        lvol.suspend_await().await.unwrap();
 
         let error = client
             .pool()
