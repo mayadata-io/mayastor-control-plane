@@ -41,7 +41,7 @@ jobs:
           nix-shell --run "./scripts/ci-report.sh"
           nix-shell --run "./scripts/python/test-residue-cleanup.sh"
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: ci-report
           path: ./ci-report/ci-report.tar.gz
