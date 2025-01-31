@@ -1,4 +1,4 @@
 [submodule "utils/dependencies"]
 	path = utils/dependencies
 	url = ../mayastor-dependencies.git
-	branch = develop
+	branch = release/2.8
