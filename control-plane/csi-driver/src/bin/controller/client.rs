@@ -123,16 +123,44 @@ impl RestApiClient {
         let url = clients::tower::Url::parse(endpoint)
             .map_err(|error| anyhow!("Invalid API endpoint URL {}: {:?}", endpoint, error))?;
         let concurrency_limit = cfg.create_volume_limit() * 2;
-        let tower = clients::tower::Configuration::builder()
-            .with_timeout(cfg.io_timeout())
-            .with_concurrency_limit(Some(concurrency_limit))
-            .build_url(url)
-            .map_err(|error| {
-                anyhow::anyhow!(
-                    "Failed to create openapi configuration, Error: '{:?}'",
-                    error
-                )
-            })?;
+        let ca_certificate_path = cfg.ca_certificate_path();
+
+        let tower = match (url.scheme(), ca_certificate_path) {
+            ("https", Some(path)) => {
+                debug!("Attempting TLS connection to {}", url);
+
+                // Use new_with_client method to create the configuration
+                clients::tower::Configuration::builder()
+                    .with_timeout(Some(cfg.io_timeout()))
+                    .with_concurrency_limit(Some(concurrency_limit))
+                    .with_certificate(path.as_bytes())
+                    .build_url(url)
+                    .map_err(|error| {
+                        anyhow::anyhow!(
+                            "Failed to create openapi configuration, Error: '{:?}'",
+                            error
+                        )
+                    })?
+            },
+            ("https", None) => {
+                anyhow::bail!("HTTPS endpoint requires a CA certificate path");
+            },
+            (_, Some(_path)) => {
+                anyhow::bail!("CA certificate path is only supported for HTTPS endpoints");
+            },
+            _ => {
+                clients::tower::Configuration::builder()
+                    .with_timeout(Some(cfg.io_timeout()))
+                    .with_concurrency_limit(Some(concurrency_limit))
+                    .build_url(url)
+                    .map_err(|error| {
+                        anyhow::anyhow!(
+                            "Failed to create openapi configuration, Error: '{:?}'",
+                            error
+                        )
+                    })?
+            }
+        };
 
         REST_CLIENT.get_or_init(|| Self {
             rest_client: clients::tower::ApiClient::new(tower.clone()),
