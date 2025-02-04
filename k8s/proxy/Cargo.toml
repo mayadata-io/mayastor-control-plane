@@ -25,4 +25,4 @@ hyper-body = { path = "../../utils/hyper-body" }
 
 anyhow = "1.0.92"
 thiserror = "1.0.68"
-url = "2.5.2"
+url = "2.5.4"
