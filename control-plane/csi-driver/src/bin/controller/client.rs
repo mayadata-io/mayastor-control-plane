@@ -124,16 +124,22 @@ impl RestApiClient {
             .map_err(|error| anyhow!("Invalid API endpoint URL {}: {:?}", endpoint, error))?;
         let concurrency_limit = cfg.create_volume_limit() * 2;
         let ca_certificate_path = cfg.ca_certificate_path();
-
-        let tower = match (url.scheme(), ca_certificate_path) {
-            ("https", Some(path)) => {
+        let cert = match ca_certificate_path {
+            Some(path) => {
+                let cert = std::fs::read(path).expect("Failed to read certificate file");
+                Some(cert)
+            },
+            None => None,
+        };
+        let tower = match (url.scheme(), cert) {
+            ("https", Some(cert)) => {
                 debug!("Attempting TLS connection to {}", url);
 
                 // Use new_with_client method to create the configuration
                 clients::tower::Configuration::builder()
                     .with_timeout(Some(cfg.io_timeout()))
                     .with_concurrency_limit(Some(concurrency_limit))
-                    .with_certificate(path.as_bytes())
+                    .with_certificate(cert.as_slice())
                     .build_url(url)
                     .map_err(|error| {
                         anyhow::anyhow!(

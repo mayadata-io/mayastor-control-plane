@@ -31,7 +31,7 @@ use kube::{
 use mayastorpool::client::{check_crd, delete, list};
 use openapi::clients::{self, tower::Url};
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use tracing::{error, info, trace, warn};
+use tracing::{error, info, trace, warn, debug};
 use utils::tracing_telemetry::{FmtLayer, FmtStyle};
 
 const PAGINATION_LIMIT: u32 = 100;
@@ -129,14 +129,47 @@ async fn pool_controller(args: ArgMatches) -> anyhow::Result<()> {
         .expect("timeout value is invalid")
         .into();
 
-    let cfg = clients::tower::Configuration::new(url, timeout, None, None, true, None).map_err(
-        |error| {
-            anyhow::anyhow!(
-                "Failed to create openapi configuration, Error: '{:?}'",
-                error
-            )
+    let ca_certificate_path:Option<&str> = args.get_one::<String>("tls-client-ca-path").map(|x| x.as_str());
+    // take in cert path and make pem file
+    let cert = match ca_certificate_path {
+        Some(path) => {
+            let cert = std::fs::read(path).expect("Failed to read certificate file");
+            Some(cert)
         },
-    )?;
+        None => None,
+    };
+    let cfg = match (url.scheme(), cert) {
+        ("https", Some(cert)) => {
+            debug!("Attempting TLS connection to {}", url);
+
+            clients::tower::Configuration::new(url, timeout, None, Some(cert.as_slice()), true, None)
+                .map_err(
+                    |error| {
+                        anyhow::anyhow!(
+                            "Failed to create openapi configuration, Error: '{:?}'",
+                            error
+                        )
+                    },
+            )?
+        },
+        ("https", None) => {
+            anyhow::bail!("HTTPS endpoint requires a CA certificate path");
+        },
+        (_, Some(_path)) => {
+            anyhow::bail!("CA certificate path is only supported for HTTPS endpoints");
+        },
+        _ => {
+            clients::tower::Configuration::new(url, timeout, None, None, true, None)
+                .map_err(
+                    |error| {
+                        anyhow::anyhow!(
+                            "Failed to create openapi configuration, Error: '{:?}'",
+                            error
+                        )
+                    },
+            )?
+        }
+    };
     let interval = args
         .get_one::<String>("interval")
         .unwrap()
@@ -242,6 +275,11 @@ async fn main() -> anyhow::Result<()> {
                 .default_value("true")
                 .value_parser(clap::value_parser!(bool))
                 .help("Enable ansi color for logs"),
+        )
+        .arg(
+            Arg::new("tls-client-ca-path")
+                .long("tls-client-ca-path")
+                .help("path to the CA certificate file"),
         )
         .get_matches();
 
