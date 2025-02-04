@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-url = "2.5.2"
+url = "2.5.4"
 uuid = { version = "1.11.0", features = ["v4"] }
 strum = "0.26.3"
 strum_macros = "0.26.4"

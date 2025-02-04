@@ -32,7 +32,7 @@ clap = { version = "4.5.20", features = ["color", "derive", "env", "string"] }
 futures = "0.3.31"
 anyhow = "1.0.92"
 snafu = "0.8.5"
-url = "2.5.2"
+url = "2.5.4"
 http = "1.1.0"
 tinytemplate = "1.2.1"
 jsonwebtoken = "9.3.0"
