@@ -21,7 +21,7 @@ use clap::Parser;
 use grpc::{client::CoreClient, operations::jsongrpc::client::JsonGrpcClient};
 use http::Uri;
 use rustls::{pki_types::PrivateKeyDer, ServerConfig};
-use rustls_pemfile::{certs, rsa_private_keys};
+use rustls_pemfile::{certs, pkcs8_private_keys};
 use std::{fs::File, io::BufReader, time::Duration};
 use stor_port::transport_api::{RequestMinTimeout, TimeoutOptions};
 use utils::{
@@ -157,8 +157,10 @@ fn get_certificates() -> anyhow::Result<ServerConfig> {
         // guaranteed to be `Some` by the require_unless attribute
         let cert_file = CliArgs::args().cert_file.expect("cert_file is required");
         let key_file = CliArgs::args().key_file.expect("key_file is required");
+        println!("getcertificates: cert_file: {:?}, key_file: {:?}", cert_file, key_file);
         let cert_file = &mut BufReader::new(File::open(cert_file)?);
         let key_file = &mut BufReader::new(File::open(key_file)?);
+        println!("key_file get cert: {:?}", key_file);
         load_certificates(cert_file, key_file)
     }
 }
@@ -170,27 +172,32 @@ fn get_dummy_certificates() -> anyhow::Result<ServerConfig> {
     load_certificates(cert_file, key_file)
 }
 
-fn load_certificates<R: std::io::Read>(
+fn load_certificates<R: std::io::Read + std::fmt::Debug>(
     cert_file: &mut BufReader<R>,
     key_file: &mut BufReader<R>,
 ) -> anyhow::Result<ServerConfig> {
+    println!("Key file: {:?}", key_file);
+    println!("Cert file: {:?}", cert_file);
     let config = ServerConfig::builder();
     let cert_chain = certs(cert_file)
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| {
             anyhow::anyhow!("Failed to retrieve certificates from the certificate file",)
         })?;
-    let mut keys = rsa_private_keys(key_file)
+    let mut keys: Vec<rustls::pki_types::PrivatePkcs8KeyDer<'_>> = pkcs8_private_keys(key_file)
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| {
             anyhow::anyhow!("Failed to retrieve the rsa private keys from the key file",)
         })?;
+
+    println!("keys: {:?}", keys);
+
     if keys.is_empty() {
         anyhow::bail!("No keys found in the keys file");
     }
     let config = config
         .with_no_client_auth()
-        .with_single_cert(cert_chain, PrivateKeyDer::Pkcs1(keys.remove(0)))?;
+        .with_single_cert(cert_chain, PrivateKeyDer::Pkcs8(keys.remove(0)))?;
     Ok(config)
 }
 
