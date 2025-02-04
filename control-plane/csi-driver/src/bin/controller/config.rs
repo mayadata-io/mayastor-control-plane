@@ -1,7 +1,11 @@
 use anyhow::Context;
 use clap::ArgMatches;
 use once_cell::sync::OnceCell;
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 static CONFIG: OnceCell<CsiControllerConfig> = OnceCell::new();
 
@@ -17,6 +21,8 @@ pub(crate) struct CsiControllerConfig {
     create_volume_limit: usize,
     /// Force unstage volume.
     force_unstage_volume: bool,
+    /// Path to the CA certificate file.
+    ca_certificate_path: Option<PathBuf>,
 }
 
 impl CsiControllerConfig {
@@ -50,7 +56,9 @@ impl CsiControllerConfig {
             tracing::warn!(
                 "Force unstage volume is disabled, can trigger potential data corruption!"
             );
-        }
+        };
+
+        let ca_certificate_path: Option<&PathBuf> = args.get_one::<PathBuf>("tls-client-ca-path");
 
         CONFIG.get_or_init(|| Self {
             rest_endpoint: rest_endpoint.into(),
@@ -58,6 +66,7 @@ impl CsiControllerConfig {
             node_selector,
             create_volume_limit,
             force_unstage_volume,
+            ca_certificate_path: ca_certificate_path.cloned(),
         });
         Ok(())
     }
@@ -91,5 +100,10 @@ impl CsiControllerConfig {
     /// Force unstage volume.
     pub(crate) fn force_unstage_volume(&self) -> bool {
         self.force_unstage_volume
+    }
+
+    /// Path to the CA certificate file.
+    pub(crate) fn ca_certificate_path(&self) -> Option<&Path> {
+        self.ca_certificate_path.as_deref()
     }
 }
