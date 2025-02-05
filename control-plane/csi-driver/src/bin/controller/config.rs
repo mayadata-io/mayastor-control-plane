@@ -17,6 +17,8 @@ pub(crate) struct CsiControllerConfig {
     create_volume_limit: usize,
     /// Force unstage volume.
     force_unstage_volume: bool,
+    /// Path to the CA certificate file.
+    ca_certificate_path: Option<String>,
 }
 
 impl CsiControllerConfig {
@@ -50,7 +52,9 @@ impl CsiControllerConfig {
             tracing::warn!(
                 "Force unstage volume is disabled, can trigger potential data corruption!"
             );
-        }
+        };
+
+        let ca_certificate_path = args.get_one::<String>("tls-client-ca-path");
 
         CONFIG.get_or_init(|| Self {
             rest_endpoint: rest_endpoint.into(),
@@ -58,6 +62,7 @@ impl CsiControllerConfig {
             node_selector,
             create_volume_limit,
             force_unstage_volume,
+            ca_certificate_path: ca_certificate_path.cloned(),
         });
         Ok(())
     }
@@ -91,5 +96,10 @@ impl CsiControllerConfig {
     /// Force unstage volume.
     pub(crate) fn force_unstage_volume(&self) -> bool {
         self.force_unstage_volume
+    }
+
+     /// Path to the CA certificate file.
+     pub(crate) fn ca_certificate_path(&self) -> Option<&str> {
+        self.ca_certificate_path.as_deref()
     }
 }

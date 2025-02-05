@@ -21,7 +21,7 @@ use clap::Parser;
 use grpc::{client::CoreClient, operations::jsongrpc::client::JsonGrpcClient};
 use http::Uri;
 use rustls::{pki_types::PrivateKeyDer, ServerConfig};
-use rustls_pemfile::{certs, rsa_private_keys};
+use rustls_pemfile::{certs, pkcs8_private_keys};
 use std::{fs::File, io::BufReader, time::Duration};
 use stor_port::transport_api::{RequestMinTimeout, TimeoutOptions};
 use utils::{
@@ -180,17 +180,18 @@ fn load_certificates<R: std::io::Read>(
         .map_err(|_| {
             anyhow::anyhow!("Failed to retrieve certificates from the certificate file",)
         })?;
-    let mut keys = rsa_private_keys(key_file)
+    let mut keys: Vec<rustls::pki_types::PrivatePkcs8KeyDer<'_>> = pkcs8_private_keys(key_file)
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| {
             anyhow::anyhow!("Failed to retrieve the rsa private keys from the key file",)
         })?;
+
     if keys.is_empty() {
         anyhow::bail!("No keys found in the keys file");
     }
     let config = config
         .with_no_client_auth()
-        .with_single_cert(cert_chain, PrivateKeyDer::Pkcs1(keys.remove(0)))?;
+        .with_single_cert(cert_chain, PrivateKeyDer::Pkcs8(keys.remove(0)))?;
     Ok(config)
 }
 
