@@ -157,10 +157,8 @@ fn get_certificates() -> anyhow::Result<ServerConfig> {
         // guaranteed to be `Some` by the require_unless attribute
         let cert_file = CliArgs::args().cert_file.expect("cert_file is required");
         let key_file = CliArgs::args().key_file.expect("key_file is required");
-        println!("getcertificates: cert_file: {:?}, key_file: {:?}", cert_file, key_file);
         let cert_file = &mut BufReader::new(File::open(cert_file)?);
         let key_file = &mut BufReader::new(File::open(key_file)?);
-        println!("key_file get cert: {:?}", key_file);
         load_certificates(cert_file, key_file)
     }
 }
@@ -172,12 +170,10 @@ fn get_dummy_certificates() -> anyhow::Result<ServerConfig> {
     load_certificates(cert_file, key_file)
 }
 
-fn load_certificates<R: std::io::Read + std::fmt::Debug>(
+fn load_certificates<R: std::io::Read>(
     cert_file: &mut BufReader<R>,
     key_file: &mut BufReader<R>,
 ) -> anyhow::Result<ServerConfig> {
-    println!("Key file: {:?}", key_file);
-    println!("Cert file: {:?}", cert_file);
     let config = ServerConfig::builder();
     let cert_chain = certs(cert_file)
         .collect::<Result<Vec<_>, _>>()
@@ -189,8 +185,6 @@ fn load_certificates<R: std::io::Read + std::fmt::Debug>(
         .map_err(|_| {
             anyhow::anyhow!("Failed to retrieve the rsa private keys from the key file",)
         })?;
-
-    println!("keys: {:?}", keys);
 
     if keys.is_empty() {
         anyhow::bail!("No keys found in the keys file");
