@@ -325,7 +325,7 @@ impl ResourceShutdownOperations for OperationGuardArc<NexusSpec> {
 
                     return Ok(());
                 }
-                // If there's no nexus, but we want to confirm shutdown, we can continue further down
+                // If no nexus, but we want to confirm shutdown, we can continue further down
                 _ if request.confirm() => {}
                 // Otherwise, we can complete here
                 _ => {
