@@ -387,6 +387,10 @@ impl VolumeSpec {
             .filter(|t| t.active)
             .map(|t| &t.target)
     }
+    /// Get the currently active target uuid.
+    pub fn target_uuid(&self) -> Option<&NexusId> {
+        self.target().map(|t| &t.nexus)
+    }
     /// Get the target.
     pub fn target_mut(&mut self) -> Option<&mut VolumeTarget> {
         self.target_config.as_mut().map(|t| &mut t.target)
