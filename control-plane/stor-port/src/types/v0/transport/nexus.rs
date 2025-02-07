@@ -624,12 +624,18 @@ pub struct ShutdownNexus {
     /// Shutdown the nexus spec even if the node is offline.
     /// The reconcilers will pick up the slack.
     lazy: bool,
+    /// Confirm shutdown by re-issuing the shutdown.
+    confirm: bool,
 }
 
 impl ShutdownNexus {
     /// Create a new `ShutdownNexus` using `uuid`.
-    pub fn new(uuid: NexusId, lazy: bool) -> Self {
-        Self { uuid, lazy }
+    pub fn new(uuid: NexusId, lazy: bool, confirm: bool) -> Self {
+        Self {
+            uuid,
+            lazy,
+            confirm,
+        }
     }
     /// Get uuid of the nexus.
     pub fn uuid(&self) -> NexusId {
@@ -643,6 +649,10 @@ impl ShutdownNexus {
     /// Get the lazy flag.
     pub fn lazy(&self) -> bool {
         self.lazy
+    }
+    /// Get the shutdown confirmation flag.
+    pub fn confirm(&self) -> bool {
+        self.confirm
     }
 }
 
