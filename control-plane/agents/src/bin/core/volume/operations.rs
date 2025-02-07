@@ -742,6 +742,10 @@ impl ResourceShutdownOperations for OperationGuardArc<VolumeSpec> {
         for nexus_res in shutdown_nexuses {
             match nexus_res.operation_guard_wait().await {
                 Ok(mut guard) => {
+                    if self.as_ref().target_uuid() == Some(nexus_res.uuid()) {
+                        // don't remove the current target!
+                        continue;
+                    }
                     if let Ok(nexus) = registry.nexus(nexus_res.uuid()).await {
                         if Self::target_registered(request.registered_targets(), nexus)? {
                             continue;
