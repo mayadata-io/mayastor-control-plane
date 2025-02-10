@@ -210,6 +210,7 @@ async fn lazy_delete_shutdown_targets() {
         .with_tmpfs_pool(POOL_SIZE_BYTES)
         .with_cache_period("1s")
         .with_reconcile_period(Duration::from_secs(1), Duration::from_secs(1))
+        .with_req_timeouts(Duration::from_secs(1), Duration::from_secs(1))
         .build()
         .await
         .unwrap();
@@ -303,6 +304,18 @@ async fn lazy_delete_shutdown_targets() {
         .unwrap();
 
     wait_till_target_deleted(&nx_cli, &first_target).await;
+
+    vol_cli
+        .destroy(
+            &DestroyVolume {
+                uuid: volume.uuid().clone(),
+            },
+            None,
+        )
+        .await
+        .expect("failed to delete volume");
+
+    reshutdown(&cluster).await;
 }
 
 async fn find_target(client: &impl RegistryOperations, target: &Nexus) -> Option<NexusSpec> {
@@ -693,4 +706,98 @@ async fn wait_till_pool_locked(cluster: &Cluster) -> bool {
         }
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
+}
+
+async fn reshutdown(cluster: &Cluster) {
+    let client = cluster.grpc_client().volume();
+
+    client
+        .create(
+            &CreateVolume {
+                uuid: VOLUME_UUID.try_into().unwrap(),
+                size: 5242880,
+                replicas: 2,
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    let _volume = client
+        .publish(
+            &PublishVolume {
+                uuid: VOLUME_UUID.try_into().unwrap(),
+                share: Some(VolumeShareProtocol::Nvmf),
+                target_node: Some(cluster.node(1)),
+                publish_context: HashMap::new(),
+                frontend_nodes: vec![cluster.node(1).to_string()],
+            },
+            None,
+        )
+        .await
+        .expect("Volume publish should have succeeded.");
+
+    cluster.composer().pause(&cluster.node(1)).await.unwrap();
+    cluster.composer().pause(&cluster.node(0)).await.unwrap();
+
+    // Republishing volume after node restart.
+    let _volume = client
+        .republish(
+            &RepublishVolume {
+                uuid: VOLUME_UUID.try_into().unwrap(),
+                share: VolumeShareProtocol::Nvmf,
+                target_node: None,
+                reuse_existing: false,
+                frontend_node: cluster.node(1),
+                reuse_existing_fallback: false,
+            },
+            None,
+        )
+        .await
+        .expect_err("Volume republish should have not succeeded.");
+
+    cluster.composer().restart(&cluster.node(0)).await.unwrap();
+    cluster.composer().thaw(&cluster.node(1)).await.unwrap();
+
+    cluster
+        .wait_node_status(cluster.node(0), NodeStatus::Online)
+        .await
+        .unwrap();
+    cluster
+        .wait_node_status(cluster.node(1), NodeStatus::Online)
+        .await
+        .unwrap();
+
+    client
+        .destroy_shutdown_target(
+            &DestroyShutdownTargets::new(VOLUME_UUID.try_into().unwrap(), None),
+            None,
+        )
+        .await
+        .expect("Volume Destroy should succeed.");
+
+    let start = std::time::Instant::now();
+    let mut result = Ok(());
+    while start.elapsed() < std::time::Duration::from_secs(3) {
+        result = client
+            .republish(
+                &RepublishVolume {
+                    uuid: VOLUME_UUID.try_into().unwrap(),
+                    share: VolumeShareProtocol::Nvmf,
+                    target_node: None,
+                    reuse_existing: true,
+                    frontend_node: cluster.node(1),
+                    reuse_existing_fallback: true,
+                },
+                None,
+            )
+            .await
+            .map(|_| ());
+        if result.is_ok() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert!(result.is_ok(), "Volume republish should have succeeded");
 }
