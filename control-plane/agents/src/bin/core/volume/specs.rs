@@ -641,7 +641,9 @@ impl ResourceSpecsLocked {
             .values()
             .filter(|nexus| {
                 let nexus_spec = nexus.lock();
-                nexus_spec.name == id.as_str() && nexus_spec.status_info().shutdown_failed()
+                nexus_spec.name == id.as_str()
+                    && (nexus_spec.status_info().shutdown_failed()
+                        && !nexus_spec.status_info().reshutdown())
             })
             .cloned()
             .collect()
