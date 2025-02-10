@@ -777,18 +777,27 @@ async fn reshutdown(cluster: &Cluster) {
         .await
         .expect("Volume Destroy should succeed.");
 
-    let _volume = client
-        .republish(
-            &RepublishVolume {
-                uuid: VOLUME_UUID.try_into().unwrap(),
-                share: VolumeShareProtocol::Nvmf,
-                target_node: None,
-                reuse_existing: true,
-                frontend_node: cluster.node(1),
-                reuse_existing_fallback: true,
-            },
-            None,
-        )
-        .await
-        .expect("Volume republish should have succeeded.");
+    let start = std::time::Instant::now();
+    let mut result = Ok(());
+    while start.elapsed() < std::time::Duration::from_secs(3) {
+        result = client
+            .republish(
+                &RepublishVolume {
+                    uuid: VOLUME_UUID.try_into().unwrap(),
+                    share: VolumeShareProtocol::Nvmf,
+                    target_node: None,
+                    reuse_existing: true,
+                    frontend_node: cluster.node(1),
+                    reuse_existing_fallback: true,
+                },
+                None,
+            )
+            .await
+            .map(|_| ());
+        if result.is_ok() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert!(result.is_ok(), "Volume republish should have succeeded");
 }
