@@ -498,7 +498,10 @@ impl ResourcePublishing for OperationGuardArc<VolumeSpec> {
         let mut older_nexus = specs.nexus(target_cfg.target().nexus()).await?;
         let mut move_nexus = true;
         let mut nexus_node = None;
-        match healthy_volume_replicas(&spec, &older_nexus.as_ref().node, registry).await {
+        let healthy_replicas_result =
+            healthy_volume_replicas(&spec, &older_nexus.as_ref().node, registry).await;
+        let healthy_replicas = healthy_replicas_result.is_ok();
+        match healthy_replicas_result {
             Ok(_) => {
                 let reuse_existing = match request.reuse_existing_fallback
                     && !request.reuse_existing
@@ -560,7 +563,10 @@ impl ResourcePublishing for OperationGuardArc<VolumeSpec> {
 
         // Shutdown the older nexus before newer nexus creation.
         let result = older_nexus
-            .shutdown(registry, &ShutdownNexus::new(older_nexus_id, true))
+            .shutdown(
+                registry,
+                &ShutdownNexus::new(older_nexus_id, true, !healthy_replicas),
+            )
             .await;
         self.validate_update_step(registry, result, &spec_clone)
             .await?;
@@ -736,6 +742,10 @@ impl ResourceShutdownOperations for OperationGuardArc<VolumeSpec> {
         for nexus_res in shutdown_nexuses {
             match nexus_res.operation_guard_wait().await {
                 Ok(mut guard) => {
+                    if self.as_ref().target_uuid() == Some(nexus_res.uuid()) {
+                        // don't remove the current target!
+                        continue;
+                    }
                     if let Ok(nexus) = registry.nexus(nexus_res.uuid()).await {
                         if Self::target_registered(request.registered_targets(), nexus)? {
                             continue;

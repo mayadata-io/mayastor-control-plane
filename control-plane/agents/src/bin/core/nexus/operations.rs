@@ -317,11 +317,24 @@ impl ResourceShutdownOperations for OperationGuardArc<NexusSpec> {
         request: &Self::Shutdown,
     ) -> Result<(), SvcError> {
         if self.as_ref().is_shutdown() {
-            return Ok(());
+            match registry.nexus(self.uuid()).await {
+                Ok(nexus_state) => {
+                    if nexus_state.status == NexusStatus::Shutdown {
+                        self.lock().status_info.set_reshutdown();
+                    }
+
+                    return Ok(());
+                }
+                // If there's no nexus, but we want to confirm shutdown, we can continue further down
+                _ if request.confirm() => {}
+                // Otherwise, we can complete here
+                _ => {
+                    return Ok(());
+                }
+            }
         }
 
-        let node_id = self.as_ref().node.clone();
-        let node = match registry.node_wrapper(&node_id).await {
+        let node = match registry.node_wrapper(&self.as_ref().node).await {
             Err(error) if !request.lazy() => Err(error),
             other => Ok(other),
         }?;
@@ -341,7 +354,7 @@ impl ResourceShutdownOperations for OperationGuardArc<NexusSpec> {
         let result = match node {
             Ok(node) => node.shutdown_nexus(request).await,
             _ => Err(SvcError::NodeNotOnline {
-                node: node_id.to_owned(),
+                node: self.as_ref().node.to_owned(),
             }),
         };
 
@@ -350,7 +363,7 @@ impl ResourceShutdownOperations for OperationGuardArc<NexusSpec> {
         if let Err(error) = result.as_ref() {
             tracing::warn!(
                 %error,
-                node.id = %node_id,
+                node.id = %self.as_ref().node,
                 nexus.uuid = %self.uuid().as_str(),
                 "Ignoring failure to complete the nexus shutdown request",
             );
@@ -576,26 +589,33 @@ impl OperationGuardArc<NexusSpec> {
             return;
         }
 
-        let Ok(nexus_state) = registry.nexus(self.uuid()).await else {
-            return;
-        };
-
-        if nexus_state.status == NexusStatus::Shutdown {
-            self.lock().status_info.set_reshutdown();
-            return;
-        }
-
         let Ok(node) = registry.node_wrapper(&self.as_ref().node).await else {
             return;
         };
 
+        if let Some(nexus_state) = node.nexus(self.uuid()).await {
+            if nexus_state.status == NexusStatus::Shutdown {
+                self.set_reshutdown();
+                return;
+            }
+        }
+
+        if !node.read().await.is_online() {
+            return;
+        }
+
         if node
-            .shutdown_nexus(&ShutdownNexus::new(self.uuid().clone(), false))
+            .shutdown_nexus(&ShutdownNexus::new(self.uuid().clone(), false, false))
             .await
             .is_ok()
         {
-            self.info("Successfully re-shutdown nexus");
-            self.lock().status_info.set_reshutdown();
+            self.set_reshutdown();
         }
+    }
+
+    // todo: add a reshutdown flag to the persistent store!
+    fn set_reshutdown(&self) {
+        self.info("Successfully re-shutdown nexus");
+        self.lock().status_info.set_reshutdown();
     }
 }
