@@ -671,6 +671,7 @@ impl AgentToIoEngine for transport::CreatePool {
             pooltype: v1::pool::PoolType::Lvs as i32,
             cluster_size: None,
             md_args: None,
+            encryption: None,
         }
     }
 }
@@ -694,6 +695,7 @@ impl AgentToIoEngine for transport::ImportPool {
             uuid: None,
             disks: self.disks.clone().into_vec(),
             pooltype: v1::pool::PoolType::Lvs as i32,
+            encryption: None,
         }
     }
 }
