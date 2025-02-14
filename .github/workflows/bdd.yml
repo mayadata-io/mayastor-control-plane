@@ -29,6 +29,8 @@ jobs:
         run: nix-shell --run "cargo build --bins"
       - name: Setup Test Pre-Requisites
         run: |
+          sudo debconf-communicate <<< "set man-db/auto-update false" || true
+          sudo dpkg-reconfigure man-db || true
           sudo sysctl -w vm.nr_hugepages=3072
           sudo apt-get install linux-modules-extra-$(uname -r)
           sudo modprobe nvme_tcp
