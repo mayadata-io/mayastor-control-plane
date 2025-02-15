@@ -185,6 +185,7 @@ fn load_certificates<R: std::io::Read>(
         .map_err(|_| {
             anyhow::anyhow!("Failed to retrieve the rsa private keys from the key file",)
         })?;
+
     if keys.is_empty() {
         anyhow::bail!("No keys found in the keys file");
     }
