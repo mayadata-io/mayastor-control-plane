@@ -29,6 +29,7 @@ use std::{
     future::Future,
     io::ErrorKind,
     net::{IpAddr, SocketAddr},
+    path::PathBuf,
     str::FromStr,
 };
 use tokio::net::UnixListener;
@@ -191,6 +192,13 @@ pub(super) async fn main() -> anyhow::Result<()> {
                 .default_value("/var/lib/kubelet")
                 .help("Kubelet path on the host system")
         )
+        .arg(
+            Arg::new("tls-client-ca-path")
+                .long("tls-client-ca-path")
+                .value_parser(clap::value_parser!(PathBuf))
+                .requires("enable-rest")
+                .help("path to the CA certificate file")
+        )
         .subcommand(
             clap::Command::new("fs-freeze")
                 .arg(
@@ -345,7 +353,10 @@ pub(super) async fn main() -> anyhow::Result<()> {
     }
 
     // Initialize the rest api client.
-    let client = AppNodesClientWrapper::initialize(matches.get_one::<String>("rest-endpoint"))?;
+    let client = AppNodesClientWrapper::initialize(
+        matches.get_one::<String>("rest-endpoint"),
+        matches.get_one::<PathBuf>("tls-client-ca-path"),
+    )?;
 
     let registration_enabled = matches.get_flag("enable-registration");
 
@@ -403,7 +414,10 @@ impl CsiServer {
         };
 
         let vol_client = match cli_args.get_one::<String>("rest-endpoint") {
-            Some(ep) if cli_args.get_flag("enable-rest") => Some(VolumesClientWrapper::new(ep)?),
+            Some(ep) if cli_args.get_flag("enable-rest") => {
+                let cert = cli_args.get_one::<PathBuf>("tls-client-ca-path");
+                Some(VolumesClientWrapper::new(ep, cert.cloned())?)
+            }
             _ => {
                 tracing::warn!("The rest client is not enabled - functionality may be limited");
                 None

@@ -131,6 +131,11 @@ async fn main() -> anyhow::Result<()> {
                 .value_parser(clap::value_parser!(bool))
                 .help("Enable force unstage volume feature")
         )
+        .arg(
+            Arg::new("tls-client-ca-path")
+                .long("tls-client-ca-path")
+                .help("path to the CA certificate file")
+        )
         .get_matches();
 
     utils::print_package_info!();
