@@ -102,6 +102,7 @@ impl CreatePoolBody {
             id: pool_id,
             disks: self.disks.clone(),
             labels: self.labels.clone(),
+            encryption: None,
         }
     }
 }
