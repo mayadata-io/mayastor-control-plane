@@ -18,7 +18,6 @@ utils = { path = "../../utils/utils-lib" }
 
 kube = { version = "0.94.2", features = ["derive"] }
 tower = { version = "0.5.1", features = ["timeout", "util"] }
-tonic = "0.12.3"
 hyper-util = { version = "0.1.10", features = ["client", "client-legacy", "http1", "http2", "tokio", "service"] }
 hyper = { version = "1.5.0", features = ["client", "http1", "http2"] }
 hyper-body = { path = "../../utils/hyper-body" }

@@ -11,7 +11,6 @@ path = "src/lib.rs"
 
 [build-dependencies]
 tonic-build = "0.12.3"
-prost-build = "0.13.3"
 
 [dependencies]
 tonic = "0.12.3"
@@ -27,7 +26,6 @@ uuid = { version = "1.11.0", features = ["v4"] }
 tracing-opentelemetry = "0.27.0"
 opentelemetry = { version = "0.26.0" }
 opentelemetry-http = { version = "0.26.0" }
-opentelemetry-semantic-conventions = "0.26.0"
 tracing = "0.1.40"
 tower = { version = "0.5.1", features = ["timeout", "util"] }
 serde_json = "1.0.132"
