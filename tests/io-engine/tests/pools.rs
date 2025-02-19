@@ -91,6 +91,7 @@ async fn create_pool_idempotent() {
                 id: cluster.pool(0, 0),
                 disks: vec!["malloc:///disk?size_mb=100".into()],
                 labels: None,
+                encryption: None,
             },
             None,
         )
@@ -104,6 +105,7 @@ async fn create_pool_idempotent() {
                 id: cluster.pool(0, 0),
                 disks: vec!["malloc:///disk?size_mb=100".into()],
                 labels: None,
+                encryption: None,
             },
             None,
         )
@@ -123,6 +125,7 @@ async fn create_pool_idempotent_same_disk_different_query() {
                 id: cluster.pool(0, 0),
                 disks: vec!["malloc:///disk?size_mb=100&blk_size=512".into()],
                 labels: None,
+                encryption: None,
             },
             None,
         )
@@ -136,6 +139,7 @@ async fn create_pool_idempotent_same_disk_different_query() {
                 id: cluster.pool(0, 0),
                 disks: vec!["malloc:///disk?size_mb=200&blk_size=4096".into()],
                 labels: None,
+                encryption: None,
             },
             None,
         )
@@ -158,6 +162,7 @@ async fn create_pool_idempotent_different_nvmf_host() {
                 id: cluster.pool(1, 0),
                 disks: vec!["malloc:///disk?size_mb=100".into()],
                 labels: None,
+                encryption: None,
             },
             None,
         )
@@ -171,6 +176,7 @@ async fn create_pool_idempotent_different_nvmf_host() {
                 id: cluster.pool(2, 0),
                 disks: vec!["malloc:///disk?size_mb=100".into()],
                 labels: None,
+                encryption: None,
             },
             None,
         )
@@ -184,6 +190,7 @@ async fn create_pool_idempotent_different_nvmf_host() {
                 id: cluster.pool(2, 0),
                 disks: vec!["malloc:///disk?size_mb=100".into()],
                 labels: None,
+                encryption: None,
             },
             None,
         )
@@ -197,6 +204,7 @@ async fn create_pool_idempotent_different_nvmf_host() {
                 id: cluster.pool(2, 0),
                 disks: vec!["malloc:///disk?size_mb=100".into()],
                 labels: None,
+                encryption: None,
             },
             None,
         )

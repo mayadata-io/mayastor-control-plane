@@ -322,6 +322,7 @@ impl From<&dyn CreatePoolInfo> for CreatePool {
             id: data.pool_id(),
             disks: data.disks(),
             labels: data.labels(),
+            encryption: None,
         }
     }
 }

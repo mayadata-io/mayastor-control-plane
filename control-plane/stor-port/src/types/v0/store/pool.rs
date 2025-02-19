@@ -64,6 +64,7 @@ impl From<&PoolSpec> for CreatePool {
             id: pool.id.clone(),
             disks: pool.disks.clone(),
             labels: pool.labels.clone(),
+            encryption: None,
         }
     }
 }
@@ -163,6 +164,7 @@ impl From<&PoolSpec> for ImportPool {
             id: value.id.clone(),
             disks: value.disks.clone(),
             uuid: None,
+            encryption: None,
         }
     }
 }

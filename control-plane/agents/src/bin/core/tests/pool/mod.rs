@@ -56,6 +56,7 @@ async fn pool() {
                 id: "pooloop".into(),
                 disks: vec!["malloc:///disk0?size_mb=100".into()],
                 labels: None,
+                encryption: None,
             },
             None,
         )
@@ -68,6 +69,7 @@ async fn pool() {
                 id: "pooloop2".into(),
                 disks: vec!["malloc:///disk1?size_mb=100".into()],
                 labels: None,
+                encryption: None,
             },
             None,
         )
@@ -1027,6 +1029,7 @@ async fn destroy_after_restart() {
         id: "bob".into(),
         disks: pool.state().cloned().unwrap().disks,
         labels: None,
+        encryption: None,
     };
 
     client.pool().destroy(&destroy, None).await.unwrap();
@@ -1060,6 +1063,7 @@ async fn slow_create() {
             id: "bob".into(),
             disks: vec![lvol.path().into()],
             labels: Some(PoolLabel::from([("a".into(), "b".into())])),
+            encryption: None,
         };
 
         let result = client.pool().create(&create, None).await;

@@ -286,6 +286,8 @@ pub struct CreatePool {
     pub disks: Vec<PoolDeviceUri>,
     /// Labels to be set on the pool.
     pub labels: Option<PoolLabel>,
+    /// Encryption parameters for this pool.
+    pub encryption: Option<Encryption>,
 }
 
 impl CreatePool {
@@ -301,6 +303,7 @@ impl CreatePool {
             id: id.clone(),
             disks: disks.to_vec(),
             labels: labels.clone(),
+            encryption: None,
         }
     }
 }
@@ -317,6 +320,8 @@ pub struct ImportPool {
     pub disks: Vec<PoolDeviceUri>,
     /// The pool uuid if specified.
     pub uuid: Option<PoolUuid>,
+    /// Encryption parameters for this pool.
+    pub encryption: Option<Encryption>,
 }
 
 impl ImportPool {
@@ -327,6 +332,7 @@ impl ImportPool {
             id: id.clone(),
             disks: disks.to_vec(),
             uuid: None,
+            encryption: None,
         }
     }
 }
@@ -390,4 +396,37 @@ impl UnlabelPool {
     pub fn new(pool_id: PoolId, label_key: String) -> Self {
         Self { pool_id, label_key }
     }
+}
+
+/// Encryption parameters.
+#[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]
+pub struct Encryption {
+    /// Cipher to be used.
+    pub cipher: Cipher,
+    /// The encryption key.
+    pub key: Option<EncryptionKey>,
+}
+
+/// Represents an encryption key that can be used to encrypt an
+/// entity like pool or lvol/replica.
+#[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]
+pub struct EncryptionKey {
+    /// Name of the key.
+    pub key_name: String,
+    /// The AES encryption key.
+    pub key: Vec<u8>,
+    /// AES Key length.
+    pub key_length: u32,
+    /// key2 (required for AES_XTS).
+    pub key2: Option<Vec<u8>>,
+    /// The length of key2. Must be same as key_length.
+    pub key2_length: Option<u32>,
+}
+
+/// Cipher to use for encryption.
+#[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]
+pub enum Cipher {
+    #[default]
+    AesCbc,
+    AesXts,
 }
