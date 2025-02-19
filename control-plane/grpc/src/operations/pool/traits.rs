@@ -1,3 +1,4 @@
+use crate::misc::traits::ValidateRequestTypes;
 use crate::{
     common,
     context::Context,
@@ -12,10 +13,10 @@ use stor_port::{
     transport_api::{v0::Pools, ReplyError, ResourceKind},
     types::v0::{
         store::pool::{PoolLabel, PoolSpec, PoolSpecStatus},
-        transport,
         transport::{
-            CreatePool, CtrlPoolState, DestroyPool, Filter, LabelPool, NodeId, Pool, PoolDeviceUri,
-            PoolId, PoolState, UnlabelPool, VolumeId,
+            Cipher, CreatePool, CtrlPoolState, DestroyPool, Encryption, EncryptionKey, Filter,
+            LabelPool, NodeId, Pool, PoolDeviceUri, PoolId, PoolState, PoolStatus, UnlabelPool,
+            VolumeId,
         },
     },
     IntoOption,
@@ -244,14 +245,16 @@ impl TryFrom<get_pools_request::Filter> for Filter {
 /// CreatePoolInfo trait for the pool creation to be implemented by entities which want to avail
 /// this operation
 pub trait CreatePoolInfo: Send + Sync + std::fmt::Debug {
-    /// Id of the pool
+    /// Id of the pool.
     fn pool_id(&self) -> PoolId;
-    /// Id of the IoEngine instance
+    /// Id of the IoEngine instance.
     fn node_id(&self) -> NodeId;
-    /// Disk device paths or URIs to be claimed by the pool
+    /// Disk device paths or URIs to be claimed by the pool.
     fn disks(&self) -> Vec<PoolDeviceUri>;
-    /// Labels to be set on the pool
+    /// Labels to be set on the pool.
     fn labels(&self) -> Option<PoolLabel>;
+    /// Encryption parameters for the pool.
+    fn encryption(&self) -> Option<Encryption>;
 }
 
 /// DestroyPoolInfo trait for the pool deletion to be implemented by entities which want to avail
@@ -279,26 +282,60 @@ impl CreatePoolInfo for CreatePool {
     fn labels(&self) -> Option<PoolLabel> {
         self.labels.clone()
     }
+
+    fn encryption(&self) -> Option<Encryption> {
+        self.encryption.clone()
+    }
 }
 
-impl CreatePoolInfo for CreatePoolRequest {
+/// Intermediate structure that validates the conversion to CreatePoolRequest type.
+#[derive(Debug)]
+pub struct ValidatedCreatePoolRequest {
+    inner: CreatePoolRequest,
+    encryption: Option<Encryption>,
+}
+
+impl CreatePoolInfo for ValidatedCreatePoolRequest {
     fn pool_id(&self) -> PoolId {
-        self.pool_id.clone().into()
+        self.inner.pool_id.clone().into()
     }
 
     fn node_id(&self) -> NodeId {
-        self.node_id.clone().into()
+        self.inner.node_id.clone().into()
     }
 
     fn disks(&self) -> Vec<PoolDeviceUri> {
-        self.disks.iter().map(|disk| disk.into()).collect()
+        self.inner.disks.iter().map(|disk| disk.into()).collect()
     }
 
     fn labels(&self) -> Option<PoolLabel> {
-        match self.labels.clone() {
+        match self.inner.labels.clone() {
             None => None,
             Some(labels) => Some(labels.value),
         }
+    }
+
+    fn encryption(&self) -> Option<Encryption> {
+        self.encryption.clone()
+    }
+}
+
+impl ValidateRequestTypes for CreatePoolRequest {
+    type Validated = ValidatedCreatePoolRequest;
+    fn validated(self) -> Result<Self::Validated, ReplyError> {
+        Ok(ValidatedCreatePoolRequest {
+            encryption: match self.encryption.clone() {
+                Some(encryption) => Some(Encryption::try_from(encryption).map_err(|err| {
+                    ReplyError::invalid_argument(
+                        ResourceKind::Volume,
+                        "create_pool_request.encryption",
+                        err.to_string(),
+                    )
+                })?),
+                None => None,
+            },
+            inner: self,
+        })
     }
 }
 
@@ -311,6 +348,7 @@ impl From<&dyn CreatePoolInfo> for CreatePoolRequest {
             labels: data
                 .labels()
                 .map(|labels| crate::common::StringMapValue { value: labels }),
+            encryption: data.encryption().into_opt(),
         }
     }
 }
@@ -322,7 +360,7 @@ impl From<&dyn CreatePoolInfo> for CreatePool {
             id: data.pool_id(),
             disks: data.disks(),
             labels: data.labels(),
-            encryption: None,
+            encryption: data.encryption(),
         }
     }
 }
@@ -365,7 +403,7 @@ impl From<&dyn DestroyPoolInfo> for DestroyPool {
     }
 }
 
-impl From<pool::PoolStatus> for transport::PoolStatus {
+impl From<pool::PoolStatus> for PoolStatus {
     fn from(src: pool::PoolStatus) -> Self {
         match src {
             pool::PoolStatus::Online => Self::Online,
@@ -376,13 +414,13 @@ impl From<pool::PoolStatus> for transport::PoolStatus {
     }
 }
 
-impl From<transport::PoolStatus> for pool::PoolStatus {
-    fn from(pool_status: transport::PoolStatus) -> Self {
+impl From<PoolStatus> for pool::PoolStatus {
+    fn from(pool_status: PoolStatus) -> Self {
         match pool_status {
-            transport::PoolStatus::Unknown => Self::Unknown,
-            transport::PoolStatus::Online => Self::Online,
-            transport::PoolStatus::Degraded => Self::Degraded,
-            transport::PoolStatus::Faulted => Self::Faulted,
+            PoolStatus::Unknown => Self::Unknown,
+            PoolStatus::Online => Self::Online,
+            PoolStatus::Degraded => Self::Degraded,
+            PoolStatus::Faulted => Self::Faulted,
         }
     }
 }
@@ -509,6 +547,77 @@ impl From<&dyn UnlabelPoolInfo> for UnlabelPool {
         Self {
             pool_id: data.pool_id(),
             label_key: data.label_key(),
+        }
+    }
+}
+
+impl From<Encryption> for common::Encryption {
+    fn from(value: Encryption) -> Self {
+        let cipher: common::Cipher = From::from(value.cipher);
+        Self {
+            cipher: cipher as i32,
+            key: value.key.into_opt(),
+        }
+    }
+}
+
+impl From<Cipher> for common::Cipher {
+    fn from(value: Cipher) -> Self {
+        match value {
+            Cipher::AesCbc => common::Cipher::AesCbc,
+            Cipher::AesXts => common::Cipher::AesXts,
+        }
+    }
+}
+
+impl From<EncryptionKey> for common::EncryptionKey {
+    fn from(value: EncryptionKey) -> Self {
+        Self {
+            key_name: value.key_name,
+            key: value.key,
+            key_length: value.key_length,
+            key2: value.key2,
+            key2_length: value.key2_length,
+        }
+    }
+}
+
+impl TryFrom<common::Encryption> for Encryption {
+    type Error = ReplyError;
+    fn try_from(value: common::Encryption) -> Result<Self, Self::Error> {
+        let cipher: Cipher = common::Cipher::try_from(value.cipher)
+            .map_err(|_| {
+                ReplyError::invalid_argument(
+                    ResourceKind::Pool,
+                    "encryption.cipher",
+                    "".to_string(),
+                )
+            })?
+            .into();
+        Ok(Self {
+            cipher,
+            key: value.key.into_opt(),
+        })
+    }
+}
+
+impl From<common::Cipher> for Cipher {
+    fn from(value: common::Cipher) -> Self {
+        match value {
+            common::Cipher::AesCbc => Cipher::AesCbc,
+            common::Cipher::AesXts => Cipher::AesXts,
+        }
+    }
+}
+
+impl From<common::EncryptionKey> for EncryptionKey {
+    fn from(value: common::EncryptionKey) -> Self {
+        Self {
+            key_name: value.key_name,
+            key: value.key,
+            key_length: value.key_length,
+            key2: value.key2,
+            key2_length: value.key2_length,
         }
     }
 }

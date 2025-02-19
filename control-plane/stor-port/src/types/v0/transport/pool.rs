@@ -297,13 +297,14 @@ impl CreatePool {
         id: &PoolId,
         disks: &[PoolDeviceUri],
         labels: &Option<PoolLabel>,
+        encryption: &Option<Encryption>,
     ) -> Self {
         Self {
             node: node.clone(),
             id: id.clone(),
             disks: disks.to_vec(),
             labels: labels.clone(),
-            encryption: None,
+            encryption: encryption.clone(),
         }
     }
 }

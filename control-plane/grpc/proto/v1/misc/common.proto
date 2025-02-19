@@ -215,3 +215,31 @@ message SpecOperation {
 message MapWrapper {
   map<string, string> map = 1;
 }
+
+// Cipher to use for encryption.
+enum Cipher {
+  AES_CBC = 0;
+  AES_XTS = 1;
+}
+
+// Represents an encryption key that can be used to encrypt an
+// entity like pool or lvol/replica.
+message EncryptionKey {
+  // Name of the key.
+  string key_name = 1;
+  // The AES encryption key.
+  bytes key = 2;
+  // AES Key length.
+  uint32 key_length = 3;
+  // key2 (required for AES_XTS).
+  optional bytes key2 = 4;
+  // The length of key2. Must be same as key_length.
+  optional uint32 key2_length = 5;
+}
+
+message Encryption {
+  // Cipher to be used.
+  Cipher cipher = 1;
+  // The encryption key.
+  EncryptionKey key = 2;
+}
