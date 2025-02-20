@@ -192,6 +192,7 @@ impl From<Volume> for volume::Volume {
             target: volume.state().target.map(|target| target.into()),
             replica_topology: to_grpc_replica_topology_map(volume.state().replica_topology),
             usage: volume.state().usage.into_opt(),
+            health: None,
         };
         volume::Volume {
             definition: Some(volume_definition),
@@ -507,6 +508,7 @@ impl From<ReplicaTopology> for volume::ReplicaTopology {
                 .child_status_reason()
                 .map(|s| crate::nexus::ChildStateReason::from(s).into()),
             rebuild_progress: replica_topology.rebuild_progress().map(|r| r as u32),
+            healthy: None,
         }
     }
 }
