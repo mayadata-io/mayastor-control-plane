@@ -5,7 +5,6 @@ edition = "2021"
 
 [build-dependencies]
 tonic-build = "0.12.3"
-prost-build = "0.13.3"
 
 [dependencies]
 tonic = "0.12.3"
