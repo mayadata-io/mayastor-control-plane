@@ -3667,6 +3667,7 @@ components:
       enum:
         - Unknown
         - Online
+        - Offline
         - Degraded
         - Faulted
         - Shutdown
@@ -3730,11 +3731,19 @@ components:
         size: 80241024
         status: Online
         uuid: 4be37dbd-4b60-44f3-b807-08f6693522ac
+        health:
+          cleanShutdown: false
+          healthyReplicas: 1
+          cleanReplicas: 1
+          onlineHealthyReplicas: 1
+          onlineCleanReplicas: 1
+          liveHealthyReplicas: 1
         replica_topology:
           03f0c3f1-4d3e-44e5-b768-4c50e53f7a34:
             node: io-engine-1
             pool: pool-1
             state: Online
+            healthy: true
       description: Runtime state of the volume
       type: object
       properties:
@@ -3753,6 +3762,8 @@ components:
           description: name of the volume
           type: string
           format: uuid
+        health:
+          $ref: '#/components/schemas/VolumeHealth'
         replica_topology:
           description: replica topology information
           type: object
@@ -3765,6 +3776,50 @@ components:
         - uuid
         - status
         - replica_topology
+    VolumeHealth:
+      description: Contains extra volume health information.
+      type: object
+      example:
+        cleanShutdown: false
+        healthyReplicas: 3
+        cleanReplicas: 1
+        onlineHealthyReplicas: 2
+        onlineCleanReplicas: 0
+        liveHealthyReplicas: 0
+      properties:
+        cleanShutdown:
+          description: Indicates if the volume target was cleanly shutdown.
+          type: boolean
+        healthyReplicas:
+          description: Indicates how many volume replicas are marked as healthy.
+          type: integer
+          format: uint8
+        cleanReplicas:
+          description: |-
+            Indicates how many volume healthy replicas were part of a clean shutdown.
+            If cleanShutdown is true, then this is equal to healthyReplicas.
+            If cleanShutdown is true, then this is equal to 1.
+          type: integer
+          format: uint8
+        onlineHealthyReplicas:
+          description: Indicates how many volume healthyReplicas are online.
+          type: integer
+          format: uint8
+        onlineCleanReplicas:
+          description: Indicates how many volume cleanReplicas are online.
+          type: integer
+          format: uint8
+        liveHealthyReplicas:
+          description: Indicates how many volume replicas are currently online in the volume target.
+          type: integer
+          format: uint8
+      required:
+        - cleanShutdown
+        - healthyReplicas
+        - cleanReplicas
+        - onlineHealthyReplicas
+        - onlineCleanReplicas
+        - liveHealthyReplicas
     VolumeUsage:
       example:
       description: Volume space usage
@@ -4106,6 +4161,9 @@ components:
           type: integer
           minimum: 0
           maximum: 100
+        healthy:
+          description: Indicates if the replica is marked as healthy
+          type: boolean
       required:
         - state
     ReplicaUsage:

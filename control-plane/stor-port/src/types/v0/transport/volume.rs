@@ -174,6 +174,7 @@ impl From<VolumeState> for models::VolumeState {
                 .map(|(k, v)| (k.into(), v.into()))
                 .collect(),
             usage: volume.usage.into_opt(),
+            health: None,
         }
     }
 }
@@ -899,6 +900,7 @@ impl From<&ReplicaTopology> for models::ReplicaTopology {
                 .and_then(Into::into),
             replica_topology.usage.as_ref().into_opt(),
             replica_topology.rebuild_progress.into_opt(),
+            None,
         )
     }
 }
