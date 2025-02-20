@@ -1,3 +1,4 @@
+use crate::misc::traits::ValidateRequestTypes;
 use crate::{
     operations::pool::traits::PoolOperations,
     pool,
@@ -38,7 +39,7 @@ impl PoolGrpc for PoolServer {
         &self,
         request: Request<CreatePoolRequest>,
     ) -> Result<tonic::Response<pool::CreatePoolReply>, tonic::Status> {
-        let req: CreatePoolRequest = request.into_inner();
+        let req = request.into_inner().validated()?;
         match self.service.create(&req, None).await {
             Ok(pool) => Ok(Response::new(CreatePoolReply {
                 reply: Some(create_pool_reply::Reply::Pool(pool.into())),

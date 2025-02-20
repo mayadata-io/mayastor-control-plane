@@ -98,6 +98,8 @@ message CreatePoolRequest {
   repeated string disks = 3;
   // labels to be set on the pool
   optional common.StringMapValue labels = 5;
+  // Encryption parameters for this pool.
+  optional common.Encryption encryption = 6;
 }
 
 // Destroy Pool Request
