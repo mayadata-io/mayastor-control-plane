@@ -1,10 +1,12 @@
 use super::*;
 use grpc::operations::nexus::traits::NexusOperations;
-use stor_port::types::v0::{
-    openapi::apis::Uuid,
-    transport::{DestroyNexus, Filter, UnshareNexus},
+use stor_port::{
+    transport_api::{ReplyError, ReplyErrorKind, ResourceKind},
+    types::v0::{
+        openapi::apis::Uuid,
+        transport::{DestroyNexus, Filter, UnshareNexus},
+    },
 };
-use transport_api::{ReplyError, ReplyErrorKind, ResourceKind};
 
 fn client() -> impl NexusOperations {
     core_grpc().nexus()

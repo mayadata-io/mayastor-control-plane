@@ -2,8 +2,10 @@ use super::*;
 use grpc::operations::pool::traits::PoolOperations;
 use rest_client::versions::v0::apis::Uuid;
 use std::collections::HashMap;
-use stor_port::types::v0::transport::{DestroyPool, Filter, UnlabelPool};
-use transport_api::{ReplyError, ReplyErrorKind, ResourceKind};
+use stor_port::{
+    transport_api::{ReplyError, ReplyErrorKind, ResourceKind},
+    types::v0::transport::{DestroyPool, Filter, UnlabelPool},
+};
 
 fn client() -> impl PoolOperations {
     core_grpc().pool()

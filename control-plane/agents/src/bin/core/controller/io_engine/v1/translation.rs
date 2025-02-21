@@ -31,6 +31,16 @@ pub(super) trait AgentToIoEngine {
     fn to_rpc(&self) -> Self::IoEngineMessage;
 }
 
+/// Trait for trying to convert agent messages to io-engine messages.
+pub(super) trait TryAgentToIoEngine {
+    /// RpcIoEngine message type.
+    type IoEngineMessage;
+    /// The error type to return.
+    type Error;
+    /// Conversion of agent message to io-engine message.
+    fn to_rpc(&self) -> Result<Self::IoEngineMessage, Self::Error>;
+}
+
 impl IoEngineToAgent for v1::host::Partition {
     type AgentMessage = transport::Partition;
     fn to_agent(&self) -> Self::AgentMessage {
@@ -660,22 +670,23 @@ impl IoEngineToAgent for v1::pool::Pool {
     }
 }
 
-impl AgentToIoEngine for transport::CreatePool {
+impl TryAgentToIoEngine for transport::CreatePool {
     type IoEngineMessage = v1::pool::CreatePoolRequest;
+    type Error = SvcError;
     /// This converts Control plane CreatePool struct to IO Engine gRPC message.
-    fn to_rpc(&self) -> Self::IoEngineMessage {
-        Self::IoEngineMessage {
+    fn to_rpc(&self) -> Result<Self::IoEngineMessage, Self::Error> {
+        Ok(Self::IoEngineMessage {
             name: self.id.clone().into(),
             disks: self.disks.iter().map(|d| d.to_string()).collect(),
             uuid: None,
             pooltype: v1::pool::PoolType::Lvs as i32,
             cluster_size: None,
             md_args: None,
-            encryption: self
-                .encryption
-                .clone()
-                .map(|encr| From::from(ExternalType(encr))),
-        }
+            encryption: match self.encryption.clone() {
+                None => None,
+                Some(encyrption) => Some(TryFrom::try_from(ExternalType(encyrption))?),
+            },
+        })
     }
 }
 
@@ -690,19 +701,20 @@ impl AgentToIoEngine for transport::DestroyPool {
     }
 }
 
-impl AgentToIoEngine for transport::ImportPool {
+impl TryAgentToIoEngine for transport::ImportPool {
     type IoEngineMessage = v1::pool::ImportPoolRequest;
-    fn to_rpc(&self) -> Self::IoEngineMessage {
-        v1::pool::ImportPoolRequest {
+    type Error = SvcError;
+    fn to_rpc(&self) -> Result<Self::IoEngineMessage, Self::Error> {
+        Ok(v1::pool::ImportPoolRequest {
             name: self.id.clone().into(),
             uuid: None,
             disks: self.disks.clone().into_vec(),
             pooltype: v1::pool::PoolType::Lvs as i32,
-            encryption: self
-                .encryption
-                .clone()
-                .map(|encr| From::from(ExternalType(encr))),
-        }
+            encryption: match self.encryption.clone() {
+                None => None,
+                Some(encyrption) => Some(TryFrom::try_from(ExternalType(encyrption))?),
+            },
+        })
     }
 }
 
@@ -878,12 +890,25 @@ impl TryFrom<v1::snapshot_rebuild::SnapshotRebuild> for super::super::types::Sna
     }
 }
 
-impl From<ExternalType<Encryption>> for v1::pb::Encryption {
-    fn from(value: ExternalType<Encryption>) -> Self {
-        let cipher: v1::pb::Cipher = From::from(ExternalType(value.0.cipher));
-        Self {
-            cipher: cipher as i32,
-            key: value.0.key.map(|key| From::from(ExternalType(key))),
+impl TryFrom<ExternalType<Encryption>> for v1::pb::Encryption {
+    type Error = SvcError;
+
+    fn try_from(value: ExternalType<Encryption>) -> Result<Self, Self::Error> {
+        match value.0 {
+            Encryption::Secret(_secret) => Err(SvcError::Unimplemented {
+                resource: ResourceKind::Pool,
+                request: "create_pool".to_string(),
+                source: tonic::Status::unimplemented(
+                    "Reading secret from k8s or file is yet to be added",
+                ),
+            }),
+            Encryption::EncryptionParams(params) => {
+                let cipher: v1::pb::Cipher = From::from(ExternalType(params.cipher));
+                Ok(Self {
+                    cipher: cipher as i32,
+                    key: Some(From::from(ExternalType(params.key))),
+                })
+            }
         }
     }
 }

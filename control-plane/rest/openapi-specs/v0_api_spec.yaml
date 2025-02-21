@@ -2472,6 +2472,15 @@ components:
       example:
         disks:
           - 'malloc:///disk?size_mb=100'
+        encryption:
+          encryption_params:
+            cipher: AES_XTS
+            key:
+              key_name: encrkey
+              key: [ 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 49, 50, 51, 52, 53, 54, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 100, 101, 97, 100, 99, 49 ]
+              key_length: 128
+              key2: [ 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 49, 50, 51, 52, 53, 54, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 100, 101, 97, 100, 99, 48 ]
+              key2_length: 128
       description: Create Pool Body
       type: object
       properties:
@@ -2490,6 +2499,8 @@ components:
           type: object
           additionalProperties:
             type: string
+        encryption:
+          $ref: '#/components/schemas/Encryption'
       required:
         - disks
     HostNqn:
@@ -4286,6 +4297,73 @@ components:
           type: integer
       required:
         - entries
+    Encryption:
+      description: Encryption secret details or the encryption params
+      type: object
+      properties:
+        secret:
+          description: Encryption secret name, could be a file name or a kubernetes secret.
+          type: string
+          example: pool-secret-encr
+        encryption_params:
+          $ref: '#/components/schemas/EncryptionParameters'
+      oneOf:
+        - required:
+            - secret
+        - required:
+            - encryption_params
+    EncryptionParameters:
+      description: Encryption parameters.
+      type: object
+      properties:
+        cipher:
+          description: Cipher to use for encryption.
+          example: AES_XTS
+          type: string
+          enum:
+            - AES_CBC
+            - AES_XTS
+        key:
+          $ref: '#/components/schemas/EncryptionKey'
+      required:
+        - cipher
+        - key
+    EncryptionKey:
+      description: Represents an encryption key that can be used to encrypt an entity like pool or replica.
+      type: object
+      properties:
+        key_name:
+          description: Name of the key.
+          example: encrkey
+          type: string
+        key:
+          description: The AES encryption key.
+          example: [ 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 49, 50, 51, 52, 53, 54, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 100, 101, 97, 100, 99, 48 ]
+          type: array
+          items:
+            type: integer
+            format: uint8
+        key_length:
+          description: AES Key length.
+          example: 128
+          type: integer
+          format: uint32
+        key2:
+          description: Key2 (required for AES_XTS).
+          example: [ 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 49, 50, 51, 52, 53, 54, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 100, 101, 97, 100, 99, 49 ]
+          type: array
+          items:
+            type: integer
+            format: uint8
+        key2_length:
+          description: The length of key2. Must be same as key_length.
+          example: 128
+          type: integer
+          format: uint32
+      required:
+        - key_name
+        - key
+        - key_length
   responses:
     ClientError:
       description: Client side error

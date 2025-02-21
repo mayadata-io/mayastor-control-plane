@@ -1,15 +1,14 @@
 #![allow(clippy::field_reassign_with_default)]
 
 use super::super::RestClient;
-use std::{
-    collections::HashMap,
-    convert::{TryFrom, TryInto},
-};
-
+use crate::versions::v0::models::Encryption;
+pub use models::rest_json_error::Kind as RestJsonErrorKind;
 pub use stor_port::{
-    transport_api,
+    transport_api::ReplyError,
     types::v0::{
-        openapi::{apis, apis::actix_server::RestError, models, tower::client},
+        openapi::{
+            apis, apis::actix_server::RestError, models, models::RestJsonError, tower::client,
+        },
         store::pool::PoolLabel,
         transport::{
             AddNexusChild, BlockDevice, Child, ChildUri, CreateNexus, CreatePool, CreateReplica,
@@ -20,22 +19,18 @@ pub use stor_port::{
             UnshareReplica, VolumeId, VolumeLabels, VolumePolicy, VolumeProperty, Watch,
             WatchCallback, WatchResourceId,
         },
-    },
-};
-
-pub use models::rest_json_error::Kind as RestJsonErrorKind;
-use stor_port::{IntoOption, IntoVec};
-
-use serde::{Deserialize, Serialize};
-use stor_port::{
-    transport_api::ReplyError,
-    types::v0::{
-        openapi::models::RestJsonError,
         transport::{AffinityGroup, CreateSnapshotVolume, HostNqn, HostNqnParseError, SnapshotId},
     },
+    IntoOption, IntoVec,
 };
 
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+};
+
 /// Create Replica Body JSON.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct CreateReplicaBody {
@@ -77,12 +72,15 @@ pub struct CreatePoolBody {
     pub disks: Vec<PoolDeviceUri>,
     /// labels to be set on the pool
     pub labels: Option<PoolLabel>,
+    /// Encryption parameters.
+    pub encryption: Option<Encryption>,
 }
 impl From<models::CreatePoolBody> for CreatePoolBody {
     fn from(src: models::CreatePoolBody) -> Self {
         Self {
             disks: src.disks.iter().cloned().map(From::from).collect(),
             labels: src.labels,
+            encryption: src.encryption.into_opt(),
         }
     }
 }
@@ -91,6 +89,7 @@ impl From<CreatePool> for CreatePoolBody {
         CreatePoolBody {
             disks: create.disks,
             labels: create.labels,
+            encryption: create.encryption.into_opt(),
         }
     }
 }
@@ -102,7 +101,7 @@ impl CreatePoolBody {
             id: pool_id,
             disks: self.disks.clone(),
             labels: self.labels.clone(),
-            encryption: None,
+            encryption: self.encryption.clone().into_opt(),
         }
     }
 }

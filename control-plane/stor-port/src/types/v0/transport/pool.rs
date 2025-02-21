@@ -400,12 +400,21 @@ impl UnlabelPool {
 }
 
 /// Encryption parameters.
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub enum Encryption {
+    /// Name of the secret or file to parse the encryption parameters.
+    Secret(String),
+    /// The Encryption parameters.
+    EncryptionParams(EncryptionParameters),
+}
+
+/// Encryption parameters.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]
-pub struct Encryption {
+pub struct EncryptionParameters {
     /// Cipher to be used.
     pub cipher: Cipher,
     /// The encryption key.
-    pub key: Option<EncryptionKey>,
+    pub key: EncryptionKey,
 }
 
 /// Represents an encryption key that can be used to encrypt an
@@ -430,4 +439,82 @@ pub enum Cipher {
     #[default]
     AesCbc,
     AesXts,
+}
+
+impl From<Encryption> for models::Encryption {
+    fn from(value: Encryption) -> Self {
+        match value {
+            Encryption::Secret(secret_name) => Self::secret(secret_name),
+            Encryption::EncryptionParams(params) => Self::encryption_params(params.into()),
+        }
+    }
+}
+
+impl From<EncryptionParameters> for models::EncryptionParameters {
+    fn from(value: EncryptionParameters) -> Self {
+        Self {
+            cipher: value.cipher.into(),
+            key: value.key.into(),
+        }
+    }
+}
+
+impl From<Cipher> for models::encryption_parameters::Cipher {
+    fn from(value: Cipher) -> Self {
+        match value {
+            Cipher::AesCbc => Self::AesCbc,
+            Cipher::AesXts => Self::AesXts,
+        }
+    }
+}
+
+impl From<EncryptionKey> for models::EncryptionKey {
+    fn from(value: EncryptionKey) -> Self {
+        Self {
+            key_name: value.key_name,
+            key: value.key,
+            key_length: value.key_length,
+            key2: value.key2,
+            key2_length: value.key2_length,
+        }
+    }
+}
+
+impl From<models::Encryption> for Encryption {
+    fn from(value: models::Encryption) -> Self {
+        match value {
+            models::Encryption::secret(secret_name) => Self::Secret(secret_name),
+            models::Encryption::encryption_params(params) => Self::EncryptionParams(params.into()),
+        }
+    }
+}
+
+impl From<models::EncryptionParameters> for EncryptionParameters {
+    fn from(value: models::EncryptionParameters) -> Self {
+        Self {
+            cipher: value.cipher.into(),
+            key: value.key.into(),
+        }
+    }
+}
+
+impl From<models::encryption_parameters::Cipher> for Cipher {
+    fn from(value: models::encryption_parameters::Cipher) -> Self {
+        match value {
+            models::encryption_parameters::Cipher::AesCbc => Self::AesCbc,
+            models::encryption_parameters::Cipher::AesXts => Self::AesXts,
+        }
+    }
+}
+
+impl From<models::EncryptionKey> for EncryptionKey {
+    fn from(value: models::EncryptionKey) -> Self {
+        Self {
+            key_name: value.key_name,
+            key: value.key,
+            key_length: value.key_length,
+            key2: value.key2,
+            key2_length: value.key2_length,
+        }
+    }
 }

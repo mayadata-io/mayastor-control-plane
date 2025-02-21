@@ -30,13 +30,13 @@ use once_cell::sync::OnceCell;
 use rest_client::versions::v0::*;
 use serde::Deserialize;
 pub use stor_port::{
+    transport_api::{ReplyError, ReplyErrorKind, ResourceKind},
     types::v0::openapi::{
         apis::actix_server::{Body, Path, Query, RestError},
         models::RestJsonError,
     },
     IntoVec,
 };
-use transport_api::{ReplyError, ReplyErrorKind, ResourceKind};
 
 /// Once cell static variable to store the grpc client and initialise once at startup
 pub static CORE_CLIENT: OnceCell<CoreClient> = OnceCell::new();

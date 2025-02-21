@@ -1,11 +1,13 @@
 use super::*;
 use crate::v0::nexuses::nexus;
 use grpc::operations::nexus::traits::NexusOperations;
-use stor_port::types::v0::{
-    openapi::apis::Uuid,
-    transport::{AddNexusChild, Child, ChildUri, Filter, Nexus, RemoveNexusChild},
+use stor_port::{
+    transport_api::{ReplyError, ReplyErrorKind, ResourceKind},
+    types::v0::{
+        openapi::apis::Uuid,
+        transport::{AddNexusChild, Child, ChildUri, Filter, Nexus, RemoveNexusChild},
+    },
 };
-use transport_api::{ReplyError, ReplyErrorKind, ResourceKind};
 
 fn client() -> impl NexusOperations {
     core_grpc().nexus()
