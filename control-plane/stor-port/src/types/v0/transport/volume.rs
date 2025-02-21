@@ -70,6 +70,39 @@ pub struct VolumeState {
     /// This field is optional because we might not be able to collect the usage information
     /// from the replicas in case the backend is offline.
     pub usage: Option<VolumeUsage>,
+    /// Volume health information.
+    pub health: Option<VolumeHealth>,
+}
+
+/// Extra volume replica health information.
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct VolumeHealth {
+    /// Indicates if the volume target was cleanly shutdown.
+    pub clean_shutdown: bool,
+    /// Indicates how many volume replicas are marked as healthy.
+    pub healthy_replicas: u8,
+    /// Indicates how many volume healthy replicas were part of a clean shutdown.
+    /// If cleanShutdown is true, then this is equal to healthyReplicas.
+    /// If cleanShutdown is true, then this is equal to 1.
+    pub clean_replicas: u8,
+    /// Indicates how many volume healthyReplicas are online.
+    pub online_healthy_replicas: u8,
+    /// Indicates how many volume cleanReplicas are online.
+    pub online_clean_replicas: u8,
+    /// Indicates how many volume replicas are currently online in the volume target.
+    pub live_healthy_replicas: u8,
+}
+impl From<VolumeHealth> for models::VolumeHealth {
+    fn from(volume: VolumeHealth) -> Self {
+        Self {
+            clean_shutdown: volume.clean_shutdown,
+            healthy_replicas: volume.healthy_replicas,
+            clean_replicas: volume.clean_replicas,
+            online_healthy_replicas: volume.online_healthy_replicas,
+            online_clean_replicas: volume.online_clean_replicas,
+            live_healthy_replicas: volume.live_healthy_replicas,
+        }
+    }
 }
 
 /// Volume properties.
@@ -174,6 +207,7 @@ impl From<VolumeState> for models::VolumeState {
                 .map(|(k, v)| (k.into(), v.into()))
                 .collect(),
             usage: volume.usage.into_opt(),
+            health: volume.health.into_opt(),
         }
     }
 }
@@ -826,10 +860,13 @@ pub struct ReplicaTopology {
     usage: Option<ReplicaUsage>,
     /// Current replica's child rebuild progress (%).
     rebuild_progress: Option<u8>,
+    /// True if the replica marked as healthy on the pstor.
+    healthy: Option<bool>,
 }
 
 impl ReplicaTopology {
     /// Create a new instance of ReplicaTopology.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         node: Option<NodeId>,
         pool: Option<PoolId>,
@@ -838,6 +875,7 @@ impl ReplicaTopology {
         child_status: Option<ChildState>,
         child_status_reason: Option<ChildStateReason>,
         rebuild_progress: Option<u8>,
+        healthy: Option<bool>,
     ) -> Self {
         Self {
             node,
@@ -847,6 +885,7 @@ impl ReplicaTopology {
             child_status,
             child_status_reason,
             rebuild_progress,
+            healthy,
         }
     }
 
@@ -884,6 +923,11 @@ impl ReplicaTopology {
     pub fn usage(&self) -> Option<&ReplicaUsage> {
         self.usage.as_ref()
     }
+
+    /// True if the replica marked as healthy on the pstor.
+    pub fn healthy(&self) -> Option<bool> {
+        self.healthy
+    }
 }
 
 impl From<&ReplicaTopology> for models::ReplicaTopology {
@@ -899,6 +943,7 @@ impl From<&ReplicaTopology> for models::ReplicaTopology {
                 .and_then(Into::into),
             replica_topology.usage.as_ref().into_opt(),
             replica_topology.rebuild_progress.into_opt(),
+            replica_topology.healthy,
         )
     }
 }

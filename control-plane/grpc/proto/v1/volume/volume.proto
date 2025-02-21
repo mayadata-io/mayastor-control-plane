@@ -58,7 +58,7 @@ message VolumeSpec {
   // Affinity Group related information.
   optional AffinityGroup affinity_group = 10;
   // Volume Content Source i.e the snapshot or a volume.
-  optional VolumeContentSource content_source  = 11;
+  optional VolumeContentSource content_source = 11;
   // Number of snapshots taken on this volume.
   uint32 num_snapshots = 12;
   // Max snapshots limit per volume.
@@ -67,7 +67,7 @@ message VolumeSpec {
   // Volume Content Source i.e the snapshot or a volume.
   message VolumeContentSource {
     oneof volume_content_source {
-        SnapshotAsSource snapshot = 1;
+      SnapshotAsSource snapshot = 1;
     }
   }
 
@@ -97,7 +97,7 @@ message AffinityGroup {
 
 message TargetConfig {
   // Persistent Configuration of the target (current/last)
-  VolumeTarget target              = 1;
+  VolumeTarget target = 1;
   // The nvmf configuration
   nexus.NexusNvmfConfig     config = 2;
   // Frontend configuration.
@@ -113,7 +113,7 @@ message FrontendNode {
   // The node name.
   string name = 1;
   // The node Nvme NQN.
-  string nqn  = 2;
+  string nqn = 2;
 }
 
 message VolumeTarget {
@@ -179,6 +179,26 @@ message VolumeState {
   map<string, ReplicaTopology> replica_topology = 5;
   // volume usage information
   optional VolumeUsage usage = 6;
+  // volume health information
+  optional VolumeHealth health = 7;
+}
+
+// Extra volume information.
+message VolumeHealth {
+  // Indicates if the volume target was cleanly shutdown.
+  bool cleanShutdown = 1;
+  // Indicates how many volume replicas are marked as healthy.
+  uint32 healthyReplicas = 2;
+  // Indicates how many volume healthy replicas were part of a clean shutdown.
+  // If cleanShutdown is true, then this is equal to healthyReplicas.
+  // If cleanShutdown is true, then this is equal to 1.
+  uint32 cleanReplicas = 3;
+  // Indicates how many volume healthyReplicas are online.
+  uint32 onlineHealthyReplicas = 4;
+  // Indicates how many volume cleanReplicas are online.
+  uint32 onlineCleanReplicas = 5;
+  // Indicates how many volume replicas are currently online in the volume target.
+  uint32 liveHealthyReplicas = 6;
 }
 
 // Volume usage information
@@ -221,6 +241,8 @@ message ReplicaTopology {
   optional nexus.ChildStateReason child_status_reason = 6;
   // current rebuild progress (%)
   optional uint32 rebuild_progress = 7;
+  // if the replica marked as healthy on the pstor.
+  optional bool healthy = 8;
 }
 
 // Volume Replica usage information

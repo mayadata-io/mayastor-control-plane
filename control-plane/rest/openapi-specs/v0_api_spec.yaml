@@ -24,7 +24,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nexuses/{nexus_id}':
     get:
       tags:
@@ -49,7 +49,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Nexuses
@@ -69,7 +69,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nexuses/{nexus_id}/children':
     get:
       tags:
@@ -96,7 +96,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nexuses/{nexus_id}/children/{child_id}':
     get:
       tags:
@@ -127,7 +127,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     put:
       tags:
         - Children
@@ -157,7 +157,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Children
@@ -183,7 +183,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   /nodes:
     get:
       tags:
@@ -208,7 +208,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{id}':
     get:
       tags:
@@ -232,7 +232,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{id}/cordon/{label}':
     put:
       tags:
@@ -261,7 +261,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Nodes
@@ -289,7 +289,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{id}/drain/{label}':
     put:
       tags:
@@ -318,7 +318,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{id}/label/{key}={value}':
     put:
       tags:
@@ -367,7 +367,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{id}/label/{key}':
     delete:
       tags:
@@ -399,7 +399,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{id}/nexuses':
     get:
       tags:
@@ -425,7 +425,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{id}/pools':
     get:
       tags:
@@ -451,7 +451,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{id}/replicas':
     get:
       tags:
@@ -477,7 +477,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node_id}/nexuses/{nexus_id}':
     get:
       tags:
@@ -507,7 +507,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     put:
       tags:
         - Nexuses
@@ -542,7 +542,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Nexuses
@@ -567,7 +567,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node_id}/nexuses/{nexus_id}/children':
     get:
       tags:
@@ -599,7 +599,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node_id}/nexuses/{nexus_id}/children/{child_id}':
     get:
       tags:
@@ -635,7 +635,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     put:
       tags:
         - Children
@@ -670,7 +670,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Children
@@ -701,7 +701,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node_id}/nexuses/{nexus_id}/share':
     delete:
       tags:
@@ -727,7 +727,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node_id}/nexuses/{nexus_id}/share/{protocol}':
     put:
       tags:
@@ -762,7 +762,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node_id}/pools/{pool_id}':
     get:
       tags:
@@ -791,7 +791,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     put:
       tags:
         - Pools
@@ -825,7 +825,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Pools
@@ -849,7 +849,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node_id}/pools/{pool_id}/replicas':
     get:
       tags:
@@ -880,7 +880,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node_id}/pools/{pool_id}/replicas/{replica_id}':
     get:
       tags:
@@ -915,7 +915,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     put:
       tags:
         - Replicas
@@ -955,7 +955,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Replicas
@@ -985,7 +985,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node_id}/pools/{pool_id}/replicas/{replica_id}/share':
     delete:
       tags:
@@ -1016,7 +1016,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node_id}/pools/{pool_id}/replicas/{replica_id}/share/nvmf':
     put:
       tags:
@@ -1059,7 +1059,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node}/block_devices':
     get:
       tags:
@@ -1090,7 +1090,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/nodes/{node}/jsongrpc/{method}':
     put:
       tags:
@@ -1125,7 +1125,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   /pools:
     get:
       tags:
@@ -1151,7 +1151,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/pools/{pool_id}':
     get:
       tags:
@@ -1175,7 +1175,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Pools
@@ -1194,7 +1194,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/pools/{pool_id}/replicas/{replica_id}':
     put:
       tags:
@@ -1230,7 +1230,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Replicas
@@ -1255,7 +1255,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/pools/{pool_id}/replicas/{replica_id}/share':
     delete:
       tags:
@@ -1281,7 +1281,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/pools/{pool_id}/replicas/{replica_id}/share/nvmf':
     put:
       tags:
@@ -1319,7 +1319,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/pools/{pool_id}/label/{key}={value}':
     put:
       tags:
@@ -1367,7 +1367,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/pools/{id}/label/{key}':
     delete:
       tags:
@@ -1398,7 +1398,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   /replicas:
     get:
       tags:
@@ -1418,7 +1418,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/replicas/{id}':
     get:
       tags:
@@ -1443,7 +1443,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   /specs:
     get:
       tags:
@@ -1461,7 +1461,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   /volumes:
     get:
       tags:
@@ -1494,13 +1494,13 @@ paths:
           content:
             application/json:
               schema:
-               $ref: '#/components/schemas/Volumes'
+                $ref: '#/components/schemas/Volumes'
         '4XX':
           $ref: '#/components/responses/ClientError'
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes/{volume_id}':
     get:
       tags:
@@ -1524,7 +1524,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     put:
       tags:
         - Volumes
@@ -1553,7 +1553,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Volumes
@@ -1572,7 +1572,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes/{volume_id}/rebuild-history':
     get:
       tags:
@@ -1628,7 +1628,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes/{volume_id}/property':
     put:
       tags:
@@ -1658,7 +1658,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes/{volume_id}/target':
     put:
       tags:
@@ -1691,7 +1691,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Volumes
@@ -1729,7 +1729,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes/{volume_id}/size':
     put:
       tags:
@@ -1761,7 +1761,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes/{volume_id}/shutdown_targets':
     delete:
       tags:
@@ -1781,7 +1781,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes/{volume_id}/share/{protocol}':
     put:
       tags:
@@ -1818,7 +1818,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes{volume_id}/share':
     delete:
       tags:
@@ -1838,7 +1838,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes/{volume_id}/snapshots/{snapshot_id}':
     get:
       tags:
@@ -1867,7 +1867,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     put:
       tags:
         - Snapshots
@@ -1895,7 +1895,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Snapshots
@@ -1919,7 +1919,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes/{volume_id}/snapshots':
     get:
       tags:
@@ -1955,7 +1955,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes/snapshots/{snapshot_id}':
     get:
       tags:
@@ -1979,7 +1979,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Snapshots
@@ -1998,7 +1998,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/volumes/snapshots':
     get:
       tags:
@@ -2041,7 +2041,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   '/snapshots/{snapshot_id}/volumes/{volume_id}':
     put:
       tags:
@@ -2102,7 +2102,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     put:
       tags:
         - Watches
@@ -2128,7 +2128,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - Watches
@@ -2154,7 +2154,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
   /app-nodes:
     get:
       tags:
@@ -2212,7 +2212,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     delete:
       tags:
         - AppNodes
@@ -2232,7 +2232,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
     get:
       tags:
         - AppNodes
@@ -2256,7 +2256,7 @@ paths:
           '5XX':
             $ref: '#/components/responses/ServerError'
       security:
-        - JWT: []
+        - JWT: [ ]
 components:
   securitySchemes:
     JWT:
@@ -2712,7 +2712,7 @@ components:
       type: object
       oneOf:
         - required:
-          - max_snapshots
+            - max_snapshots
       properties:
         max_snapshots:
           description: Max Snapshots limit per volume.
@@ -3667,6 +3667,7 @@ components:
       enum:
         - Unknown
         - Online
+        - Offline
         - Degraded
         - Faulted
         - Shutdown
@@ -3730,11 +3731,19 @@ components:
         size: 80241024
         status: Online
         uuid: 4be37dbd-4b60-44f3-b807-08f6693522ac
+        health:
+          cleanShutdown: false
+          healthyReplicas: 1
+          cleanReplicas: 1
+          onlineHealthyReplicas: 1
+          onlineCleanReplicas: 1
+          liveHealthyReplicas: 1
         replica_topology:
           03f0c3f1-4d3e-44e5-b768-4c50e53f7a34:
             node: io-engine-1
             pool: pool-1
             state: Online
+            healthy: true
       description: Runtime state of the volume
       type: object
       properties:
@@ -3753,6 +3762,8 @@ components:
           description: name of the volume
           type: string
           format: uuid
+        health:
+          $ref: '#/components/schemas/VolumeHealth'
         replica_topology:
           description: replica topology information
           type: object
@@ -3765,6 +3776,50 @@ components:
         - uuid
         - status
         - replica_topology
+    VolumeHealth:
+      description: Contains extra volume health information.
+      type: object
+      example:
+        cleanShutdown: false
+        healthyReplicas: 3
+        cleanReplicas: 1
+        onlineHealthyReplicas: 2
+        onlineCleanReplicas: 0
+        liveHealthyReplicas: 0
+      properties:
+        cleanShutdown:
+          description: Indicates if the volume target was cleanly shutdown.
+          type: boolean
+        healthyReplicas:
+          description: Indicates how many volume replicas are marked as healthy.
+          type: integer
+          format: uint8
+        cleanReplicas:
+          description: |-
+            Indicates how many volume healthy replicas were part of a clean shutdown.
+            If cleanShutdown is true, then this is equal to healthyReplicas.
+            If cleanShutdown is true, then this is equal to 1.
+          type: integer
+          format: uint8
+        onlineHealthyReplicas:
+          description: Indicates how many volume healthyReplicas are online.
+          type: integer
+          format: uint8
+        onlineCleanReplicas:
+          description: Indicates how many volume cleanReplicas are online.
+          type: integer
+          format: uint8
+        liveHealthyReplicas:
+          description: Indicates how many volume replicas are currently online in the volume target.
+          type: integer
+          format: uint8
+      required:
+        - cleanShutdown
+        - healthyReplicas
+        - cleanReplicas
+        - onlineHealthyReplicas
+        - onlineCleanReplicas
+        - liveHealthyReplicas
     VolumeUsage:
       example:
       description: Volume space usage
@@ -4021,9 +4076,9 @@ components:
       additionalProperties: false
       oneOf:
         - required:
-          - online
+            - online
         - required:
-          - offline
+            - offline
     OnlineReplicaSnapshotState:
       description: |-
         Online ReplicaSnapshotState representation.
@@ -4106,6 +4161,9 @@ components:
           type: integer
           minimum: 0
           maximum: 100
+        healthy:
+          description: Indicates if the replica is marked as healthy
+          type: boolean
       required:
         - state
     ReplicaUsage:
@@ -4208,7 +4266,7 @@ components:
           format: url
         labels:
           description: |-
-              Labels to be set on the app node.
+            Labels to be set on the app node.
           type: object
           additionalProperties:
             type: string
@@ -4243,7 +4301,7 @@ components:
           format: url
         labels:
           description: |-
-              Labels to be set on the app node.
+            Labels to be set on the app node.
           type: object
           additionalProperties:
             type: string

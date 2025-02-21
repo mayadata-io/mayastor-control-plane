@@ -28,8 +28,8 @@ use stor_port::{
             NexusNvmfConfig, NodeId, NodeTopology, NvmeNqn, PoolTopology, PublishVolume, ReplicaId,
             ReplicaStatus, ReplicaTopology, ReplicaUsage, RepublishVolume, ResizeVolume,
             SetVolumeProperty, SetVolumeReplica, ShareVolume, SnapshotId, Topology,
-            UnpublishVolume, UnshareVolume, Volume, VolumeId, VolumeLabels, VolumePolicy,
-            VolumeProperty, VolumeShareProtocol, VolumeState, VolumeUsage,
+            UnpublishVolume, UnshareVolume, Volume, VolumeHealth, VolumeId, VolumeLabels,
+            VolumePolicy, VolumeProperty, VolumeShareProtocol, VolumeState, VolumeUsage,
         },
     },
     IntoOption, IntoVec, TryIntoOption,
@@ -192,10 +192,36 @@ impl From<Volume> for volume::Volume {
             target: volume.state().target.map(|target| target.into()),
             replica_topology: to_grpc_replica_topology_map(volume.state().replica_topology),
             usage: volume.state().usage.into_opt(),
+            health: volume.state().health.into_opt(),
         };
         volume::Volume {
             definition: Some(volume_definition),
             state: Some(volume_state),
+        }
+    }
+}
+
+impl From<volume::VolumeHealth> for VolumeHealth {
+    fn from(value: volume::VolumeHealth) -> Self {
+        Self {
+            clean_shutdown: value.clean_shutdown,
+            healthy_replicas: value.healthy_replicas as u8,
+            clean_replicas: value.clean_replicas as u8,
+            online_healthy_replicas: value.online_healthy_replicas as u8,
+            online_clean_replicas: value.online_clean_replicas as u8,
+            live_healthy_replicas: value.live_healthy_replicas as u8,
+        }
+    }
+}
+impl From<VolumeHealth> for volume::VolumeHealth {
+    fn from(value: VolumeHealth) -> Self {
+        Self {
+            clean_shutdown: value.clean_shutdown,
+            healthy_replicas: value.healthy_replicas as u32,
+            clean_replicas: value.clean_replicas as u32,
+            online_healthy_replicas: value.online_healthy_replicas as u32,
+            online_clean_replicas: value.online_clean_replicas as u32,
+            live_healthy_replicas: value.live_healthy_replicas as u32,
         }
     }
 }
@@ -416,6 +442,7 @@ impl TryFrom<volume::Volume> for Volume {
                 }
             },
             usage: grpc_state.usage.into_opt(),
+            health: grpc_state.health.into_opt(),
         };
         Ok(Volume::new(volume_spec, volume_state))
     }
@@ -476,6 +503,7 @@ impl TryFrom<volume::ReplicaTopology> for ReplicaTopology {
                 .child_status_reason
                 .and_then(|s| nexus::ChildStateReason::try_from(s).ok().into_opt()),
             topology.rebuild_progress.and_then(|r| u8::try_from(r).ok()),
+            topology.healthy,
         ))
     }
 }
@@ -507,6 +535,7 @@ impl From<ReplicaTopology> for volume::ReplicaTopology {
                 .child_status_reason()
                 .map(|s| crate::nexus::ChildStateReason::from(s).into()),
             rebuild_progress: replica_topology.rebuild_progress().map(|r| r as u32),
+            healthy: replica_topology.healthy(),
         }
     }
 }

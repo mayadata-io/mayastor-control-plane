@@ -769,6 +769,7 @@ impl From<&VolumeSpec> for transport::VolumeState {
             status: transport::VolumeStatus::Unknown,
             target: None,
             replica_topology: HashMap::new(),
+            health: None,
         }
     }
 }

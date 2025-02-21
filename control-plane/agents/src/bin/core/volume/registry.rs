@@ -106,6 +106,9 @@ impl Registry {
             total_snapshots,
         ));
 
+        // todo: fill in info from the pstor(etcd)
+        let health = None;
+
         Ok(if let Some((nexus, mut nexus_state)) = nexus {
             let ah = nexus.lock().allowed_hosts.clone();
             nexus_state.device_uri = uri_with_hostnqn(&nexus_state.device_uri, &ah);
@@ -123,6 +126,7 @@ impl Registry {
                 target: Some(nexus_state),
                 replica_topology,
                 usage,
+                health,
             }
         } else {
             VolumeState {
@@ -142,6 +146,7 @@ impl Registry {
                 target: None,
                 replica_topology,
                 usage,
+                health,
             }
         })
     }
@@ -153,6 +158,8 @@ impl Registry {
         spec: &ReplicaSpec,
         nexus: &Option<(ResourceMutex<NexusSpec>, Nexus)>,
     ) -> ReplicaTopology {
+        // todo: fill in info from the pstor(etcd)
+        let healthy = None;
         match self.replica(&spec.uuid).await {
             Ok(state) => {
                 let child = nexus.as_ref().and_then(|(_, n)| n.child(&state.uri));
@@ -164,6 +171,7 @@ impl Registry {
                     child.map(|c| c.state.clone()),
                     child.map(|c| c.state_reason.clone()),
                     child.and_then(|c| c.rebuild_progress),
+                    healthy,
                 )
             }
             Err(_) => {
@@ -181,6 +189,7 @@ impl Registry {
                             Some(child.state.clone()),
                             Some(child.state_reason.clone()),
                             child.rebuild_progress,
+                            healthy,
                         );
                     }
                 }
@@ -192,6 +201,7 @@ impl Registry {
                     None,
                     None,
                     None,
+                    healthy,
                 )
             }
         }
