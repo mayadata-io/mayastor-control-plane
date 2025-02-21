@@ -237,9 +237,24 @@ message EncryptionKey {
   optional uint32 key2_length = 5;
 }
 
-message Encryption {
+/// Encryption Parameters.
+message EncryptionParameters {
   // Cipher to be used.
   Cipher cipher = 1;
   // The encryption key.
   EncryptionKey key = 2;
+}
+
+/// Secret details.
+message Secret {
+  // Name of the secret, k8s or file.
+  string name = 1;
+}
+
+/// Encryption details.
+message Encryption {
+  oneof encryption {
+    EncryptionParameters encryption_params = 1;
+    Secret secret = 2;
+  }
 }
