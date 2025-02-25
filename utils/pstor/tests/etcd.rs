@@ -1,5 +1,4 @@
 use composer::{Binary, Builder, ContainerSpec};
-use oneshot::Receiver;
 use pstor::{etcd::Etcd, Store, StoreKv, WatchEvent};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -8,7 +7,7 @@ use std::{
     str::FromStr,
     time::Duration,
 };
-use tokio::task::JoinHandle;
+use tokio::{sync::mpsc, task::JoinHandle};
 
 static ETCD_ENDPOINT: &str = "0.0.0.0:2379";
 
@@ -19,8 +18,20 @@ struct TestStruct {
     msg: String,
 }
 
+async fn recv_tmo<T>(tmo: Duration, mut rcv: mpsc::Receiver<T>) -> Result<T, String> {
+    tokio::time::timeout(tmo, rcv.recv())
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("no value".to_string())
+}
+
 #[tokio::test]
 async fn etcd() {
+    composer::initialize(
+        std::path::Path::new(std::env!("WORKSPACE_ROOT"))
+            .to_str()
+            .unwrap(),
+    );
     let _test = Builder::new()
         .name("etcd")
         .add_container_spec(
@@ -44,9 +55,13 @@ async fn etcd() {
 
     assert!(wait_for_etcd_ready(ETCD_ENDPOINT).is_ok(), "etcd not ready");
 
-    let mut store = Etcd::new(ETCD_ENDPOINT)
-        .await
-        .expect("Failed to connect to etcd.");
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !Etcd::new(ETCD_ENDPOINT).await.unwrap().online().await {}
+    })
+    .await
+    .expect("etcd to be ready");
+
+    let mut store = Etcd::new(ETCD_ENDPOINT).await.expect("to connect to etcd");
 
     let key = serde_json::json!("key");
     let mut data = TestStruct {
@@ -76,8 +91,8 @@ async fn etcd() {
         .expect("Failed to 'put' to etcd");
 
     // Wait up to 1 second for the watch to see the put event.
-    let msg = r
-        .recv_timeout(Duration::from_secs(1))
+    let msg = recv_tmo(Duration::from_secs(1), r)
+        .await
         .expect("Timed out waiting for message");
     let result: TestStruct = match msg {
         WatchEvent::Put(_k, v) => serde_json::from_value(v).expect("Failed to deserialise value"),
@@ -91,8 +106,8 @@ async fn etcd() {
     store.delete_kv(&key).await.unwrap();
 
     // Wait up to 1 second for the watch to see the delete event.
-    let msg = r
-        .recv_timeout(Duration::from_secs(1))
+    let msg = recv_tmo(Duration::from_secs(1), r)
+        .await
         .expect("Timed out waiting for message");
     match msg {
         WatchEvent::Delete => {
@@ -114,13 +129,13 @@ async fn etcd() {
 async fn spawn_watch<W: Store>(
     key: &serde_json::Value,
     store: &mut W,
-) -> (JoinHandle<()>, Receiver<WatchEvent>) {
-    let (s, r) = oneshot::channel();
+) -> (JoinHandle<()>, mpsc::Receiver<WatchEvent>) {
+    let (s, r) = mpsc::channel(1);
     let mut watch = store.watch_kv(&key).await.expect("Failed to watch");
     let hdl = tokio::spawn(async move {
         match watch.recv().await.unwrap() {
             Ok(event) => {
-                s.send(event).unwrap();
+                s.send(event).await.unwrap();
             }
             Err(_) => {
                 panic!("Failed to receive event");
