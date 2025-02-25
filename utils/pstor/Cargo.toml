@@ -16,6 +16,7 @@ serde = { version = "1.0.214", features = ["derive"] }
 async-trait = "0.1.83"
 tracing = "0.1.40"
 parking_lot = "0.12.3"
+uuid = { version = "1.11.0", features = ["v4"] }
 utils = { path = "../utils-lib" }
 
 # Utils dependencies

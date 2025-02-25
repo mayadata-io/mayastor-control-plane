@@ -1,5 +1,5 @@
-use composer::{Binary, Builder, ContainerSpec};
-use pstor::{etcd::Etcd, Store, StoreKv, WatchEvent};
+use composer::{Binary, Builder, ComposeTest, ContainerSpec};
+use pstor::{etcd::Etcd, Store, StoreKv, StoreKvWatcher, WatchEvent, WatchKey, WatchResult};
 use serde::{Deserialize, Serialize};
 use std::{
     io,
@@ -32,7 +32,7 @@ async fn etcd() {
             .to_str()
             .unwrap(),
     );
-    let _test = Builder::new()
+    let test = Builder::new()
         .name("etcd")
         .add_container_spec(
             ContainerSpec::from_binary(
@@ -122,6 +122,52 @@ async fn etcd() {
 
     put_hdl.await.unwrap();
     del_hdl.await.unwrap();
+
+    test_kv_watcher(test).await.unwrap()
+}
+
+async fn test_kv_watcher(_test: ComposeTest) -> Result<(), etcd_client::Error> {
+    utils::tracing_telemetry::TracingTelemetry::builder().init("etcd");
+
+    let mut store = Etcd::new(ETCD_ENDPOINT).await.expect("to connect to etcd");
+
+    let counter = std::sync::Arc::new(std::sync::Mutex::new(0));
+    let updates = 10;
+    let (s, r) = mpsc::channel(1);
+
+    let watcher = store.kv_watcher(move |_arg| {
+        *counter.lock().unwrap() += 1;
+        if *counter.lock().unwrap() == updates {
+            s.try_send(()).ok();
+        }
+        WatchResult::Continue
+    });
+
+    let volumes = std::iter::repeat_n(0, updates)
+        .enumerate()
+        .map(|(i, _)| format!("/volume/{i}/nexus"))
+        .collect::<Vec<_>>();
+
+    for volume in &volumes {
+        watcher
+            .watch(
+                WatchKey::new(volume).with_rev(Some(1)),
+                uuid::Uuid::new_v4(),
+            )
+            .unwrap();
+    }
+
+    for volume in &volumes {
+        store
+            .put_kv(&format!("{}/info", volume), &"b")
+            .await
+            .unwrap();
+    }
+    recv_tmo(Duration::from_secs(1), r)
+        .await
+        .expect("Should receive all updates timely");
+
+    Ok(())
 }
 
 /// Spawn a watch thread which watches for a single change to the entry with

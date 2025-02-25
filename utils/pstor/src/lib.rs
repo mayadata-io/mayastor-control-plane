@@ -16,12 +16,14 @@ mod etcd_keep_alive;
 /// Definition for the StorableObjectType.
 mod common;
 
+mod etcd_watcher;
 /// The product specific modules.
 mod products;
 
 /// Export pstor module.
 pub use api::{
-    ObjectKey, StorableObject, Store, StoreKey, StoreKv, StoreObj, StoreWatchReceiver, WatchEvent,
+    ObjectKey, StorableObject, Store, StoreKey, StoreKv, StoreKvWatcher, StoreObj,
+    StoreWatchReceiver, WatchCtx, WatchEvent, WatchKey, WatchResult,
 };
 pub use common::{ApiVersion, StorableObjectType};
 pub use products::{
