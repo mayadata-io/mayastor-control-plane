@@ -88,4 +88,6 @@ pub enum Error {
     },
     #[snafu(display("Failed to parse range end for start key: '{}'", start_key))]
     RangeEnd { start_key: String },
+    #[snafu(display("The Watcher has already been closed: this is a logical bug."))]
+    WatcherClosed {},
 }
